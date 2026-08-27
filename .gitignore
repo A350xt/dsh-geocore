@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Node
+node_modules/
+plugin-geocore/lib/
+
+# 运行期产物（均可由脚本重新生成）
+.tmp-cli/
+.tmp-probe/
+tmp-smoke/
+datasets/demo_out/
+artifacts/
+
+# 环境
+.env
+.venv/
+
+# 本机会话/工具产物（与项目源码无关）
+.mimosa/
+.zcode/

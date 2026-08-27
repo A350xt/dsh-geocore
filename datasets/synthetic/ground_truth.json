@@ -1,0 +1,33 @@
+{
+  "city_bbox_wgs84": [
+    121.35,
+    31.12,
+    121.75,
+    31.38
+  ],
+  "counts_from_construction": {
+    "districts": 6,
+    "roads_all_classes": 22,
+    "roads_highway": 2,
+    "roads_arterial": 4,
+    "roads_secondary_constructed": 16,
+    "parcels": 40,
+    "hospitals": 12,
+    "schools": 25,
+    "poi": 60
+  },
+  "aggregates": {
+    "population_total": 4160000,
+    "hospital_beds_total": 14192,
+    "school_students_total": 36783,
+    "poi_revenue_total_k": 7146,
+    "parcels_by_landuse": {
+      "居住": 19,
+      "商业": 10,
+      "工业": 7,
+      "绿地": 4
+    }
+  },
+  "seed": 42,
+  "crs_note": "全部以 EPSG:4326 存储；洪水区为河流缓冲 750 m（UTM 计算后转回）"
+}

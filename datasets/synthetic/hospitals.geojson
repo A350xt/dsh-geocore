@@ -1,0 +1,19 @@
+{
+"type": "FeatureCollection",
+"name": "hospitals",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "facility_id": "H001", "district": "城东区", "name": "仁济医院临江分院1", "beds": 1016, "grade": "三级甲等" }, "geometry": { "type": "Point", "coordinates": [ 121.578659264803633, 31.217891361841911 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H002", "district": "滨江区", "name": "临江市第2人民医院", "beds": 1380, "grade": "三级乙等" }, "geometry": { "type": "Point", "coordinates": [ 121.380026121915947, 31.256882101311064 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H003", "district": "滨江区", "name": "临江市第3人民医院", "beds": 606, "grade": "三级乙等" }, "geometry": { "type": "Point", "coordinates": [ 121.458064248218136, 31.353727656929166 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H004", "district": "城东区", "name": "仁济医院临江分院2", "beds": 1433, "grade": "三级甲等" }, "geometry": { "type": "Point", "coordinates": [ 121.522942789438815, 31.186843491939289 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H005", "district": "老城区", "name": "临江市第5人民医院", "beds": 1409, "grade": "三级乙等" }, "geometry": { "type": "Point", "coordinates": [ 121.641830357194962, 31.259329053044176 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H006", "district": "老城区", "name": "临江市第6人民医院", "beds": 1489, "grade": "二级甲等" }, "geometry": { "type": "Point", "coordinates": [ 121.731512714119518, 31.345412144193521 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H007", "district": "城东区", "name": "仁济医院临江分院3", "beds": 1348, "grade": "二级甲等" }, "geometry": { "type": "Point", "coordinates": [ 121.552066198863642, 31.162463611822318 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H008", "district": "高新区", "name": "临江市第8人民医院", "beds": 1019, "grade": "二级甲等" }, "geometry": { "type": "Point", "coordinates": [ 121.66866709803557, 31.134399492593275 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H009", "district": "高新区", "name": "临江市第9人民医院", "beds": 452, "grade": "三级甲等" }, "geometry": { "type": "Point", "coordinates": [ 121.741649085062207, 31.152679548619759 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H010", "district": "城西区", "name": "仁济医院临江分院4", "beds": 1260, "grade": "三级乙等" }, "geometry": { "type": "Point", "coordinates": [ 121.374142910015479, 31.145111648483002 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H011", "district": "城南新区", "name": "临江市第11人民医院", "beds": 1321, "grade": "二级甲等" }, "geometry": { "type": "Point", "coordinates": [ 121.511967960285347, 31.291629977157424 ] } },
+{ "type": "Feature", "properties": { "facility_id": "H012", "district": "城东区", "name": "临江市第12人民医院", "beds": 1459, "grade": "三级甲等" }, "geometry": { "type": "Point", "coordinates": [ 121.549751411320884, 31.141401245316725 ] } }
+]
+}

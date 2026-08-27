@@ -1,0 +1,32 @@
+{
+"type": "FeatureCollection",
+"name": "schools",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "facility_id": "S001", "district": "城东区", "name": "临江中学1", "students": 920, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.50261552667925, 31.206751313129494 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S002", "district": "城东区", "name": "临江市实验学校2", "students": 1667, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.574477153476423, 31.194931362940441 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S003", "district": "老城区", "name": "临江中学3", "students": 2471, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.709770195109726, 31.344234841269 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S004", "district": "高新区", "name": "临江市实验学校4", "students": 634, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.740450255913586, 31.172220297435977 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S005", "district": "城西区", "name": "临江中学5", "students": 1619, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.438749703809208, 31.241664374299962 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S006", "district": "老城区", "name": "临江市实验学校6", "students": 2796, "type": "初中" }, "geometry": { "type": "Point", "coordinates": [ 121.624592720140669, 31.321752359904199 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S007", "district": "老城区", "name": "临江中学7", "students": 585, "type": "高中" }, "geometry": { "type": "Point", "coordinates": [ 121.638836927587377, 31.305105279027131 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S008", "district": "城西区", "name": "临江市实验学校8", "students": 1909, "type": "初中" }, "geometry": { "type": "Point", "coordinates": [ 121.473001658228256, 31.222852371620252 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S009", "district": "滨江区", "name": "临江中学9", "students": 2418, "type": "高中" }, "geometry": { "type": "Point", "coordinates": [ 121.352384044604932, 31.26589419330071 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S010", "district": "城东区", "name": "临江市实验学校10", "students": 2451, "type": "初中" }, "geometry": { "type": "Point", "coordinates": [ 121.515496865759999, 31.188767218263965 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S011", "district": "老城区", "name": "临江中学11", "students": 2642, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.695918249859162, 31.30430490638367 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S012", "district": "老城区", "name": "临江市实验学校12", "students": 1449, "type": "初中" }, "geometry": { "type": "Point", "coordinates": [ 121.701940562564019, 31.359955018374034 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S013", "district": "滨江区", "name": "临江中学13", "students": 969, "type": "高中" }, "geometry": { "type": "Point", "coordinates": [ 121.380865413489559, 31.345908389767416 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S014", "district": "老城区", "name": "临江市实验学校14", "students": 584, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.629736241702886, 31.326552041664453 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S015", "district": "城东区", "name": "临江中学15", "students": 2526, "type": "高中" }, "geometry": { "type": "Point", "coordinates": [ 121.525423631601925, 31.141398114752189 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S016", "district": "滨江区", "name": "临江市实验学校16", "students": 746, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.387120393544507, 31.27148117588531 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S017", "district": "滨江区", "name": "临江中学17", "students": 357, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.35727250903193, 31.274123071146452 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S018", "district": "高新区", "name": "临江市实验学校18", "students": 1896, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.708460047514066, 31.17172771771634 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S019", "district": "老城区", "name": "临江中学19", "students": 1662, "type": "小学" }, "geometry": { "type": "Point", "coordinates": [ 121.729456221006956, 31.357953826224705 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S020", "district": "高新区", "name": "临江市实验学校20", "students": 790, "type": "初中" }, "geometry": { "type": "Point", "coordinates": [ 121.650923910231313, 31.153729781681069 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S021", "district": "老城区", "name": "临江中学21", "students": 1423, "type": "初中" }, "geometry": { "type": "Point", "coordinates": [ 121.627601741889379, 31.299539255597683 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S022", "district": "老城区", "name": "临江市实验学校22", "students": 574, "type": "高中" }, "geometry": { "type": "Point", "coordinates": [ 121.724331568823658, 31.260191629976287 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S023", "district": "城南新区", "name": "临江中学23", "students": 567, "type": "高中" }, "geometry": { "type": "Point", "coordinates": [ 121.594004904923978, 31.364610899341525 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S024", "district": "城东区", "name": "临江市实验学校24", "students": 2465, "type": "高中" }, "geometry": { "type": "Point", "coordinates": [ 121.585364881430095, 31.202444677982054 ] } },
+{ "type": "Feature", "properties": { "facility_id": "S025", "district": "城南新区", "name": "临江中学25", "students": 663, "type": "高中" }, "geometry": { "type": "Point", "coordinates": [ 121.555022742376707, 31.316752400029667 ] } }
+]
+}

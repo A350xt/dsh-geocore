@@ -1,0 +1,29 @@
+{
+"type": "FeatureCollection",
+"name": "roads",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "road_id": "R_H1", "class": "高速", "name": "沪临高速", "lanes": 6 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.35, 31.12 ], [ 121.55, 31.25 ], [ 121.75, 31.38 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_H2", "class": "高速", "name": "沿江高速", "lanes": 4 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.35, 31.38 ], [ 121.55, 31.25 ], [ 121.75, 31.12 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_AN1", "class": "主干道", "name": "临江大道1号", "lanes": 6 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.35, 31.2058 ], [ 121.75, 31.2058 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_AN2", "class": "主干道", "name": "临江大道2号", "lanes": 6 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.35, 31.2916 ], [ 121.75, 31.2916 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_AE1", "class": "主干道", "name": "纵一路1号", "lanes": 4 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.482, 31.12 ], [ 121.482, 31.38 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_AE2", "class": "主干道", "name": "纵一路2号", "lanes": 4 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.614, 31.12 ], [ 121.614, 31.38 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S01", "class": "次干道", "name": "支路01", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.38, 31.2318 ], [ 121.43, 31.2518 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S02", "class": "次干道", "name": "支路02", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.38, 31.2682 ], [ 121.43, 31.2882 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S03", "class": "次干道", "name": "支路03", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.38, 31.3046 ], [ 121.43, 31.3246 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S04", "class": "次干道", "name": "支路04", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.46, 31.1954 ], [ 121.51, 31.2154 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S05", "class": "次干道", "name": "支路05", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.46, 31.3046 ], [ 121.51, 31.3246 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S06", "class": "次干道", "name": "支路06", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.54, 31.159 ], [ 121.59, 31.179 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S07", "class": "次干道", "name": "支路07", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.54, 31.2318 ], [ 121.59, 31.2518 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S08", "class": "次干道", "name": "支路08", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.54, 31.2682 ], [ 121.59, 31.2882 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S09", "class": "次干道", "name": "支路09", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.54, 31.341 ], [ 121.59, 31.361 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S10", "class": "次干道", "name": "支路10", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.62, 31.159 ], [ 121.67, 31.179 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S11", "class": "次干道", "name": "支路11", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.62, 31.2682 ], [ 121.67, 31.2882 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S12", "class": "次干道", "name": "支路12", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.7, 31.1954 ], [ 121.75, 31.2154 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S13", "class": "次干道", "name": "支路13", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.7, 31.2318 ], [ 121.75, 31.2518 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S14", "class": "次干道", "name": "支路14", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.7, 31.2682 ], [ 121.75, 31.2882 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S15", "class": "次干道", "name": "支路15", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.7, 31.3046 ], [ 121.75, 31.3246 ] ] } },
+{ "type": "Feature", "properties": { "road_id": "R_S16", "class": "次干道", "name": "支路16", "lanes": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 121.7, 31.341 ], [ 121.75, 31.361 ] ] } }
+]
+}
