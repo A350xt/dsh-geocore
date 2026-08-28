@@ -1,41 +1,32 @@
-/** 三个 Agent-facing 工具的定义与请求映射（协议细节见 docs/tool-api.md）。 */
-
-import type { HarnessToolDef, ToolRuntimeLike } from './types.js';
-import { PythonBridge } from './bridge.js';
-
-interface RegisterTarget {
-  register: (nameOrDef: string | HarnessToolDef,
-             def?: Omit<HarnessToolDef, 'name'>) => unknown;
-}
-
-/**
- * 注册调用的 shape 自适应层。
+/** 三个 Agent-facing 工具：对齐宿主 @deepseek-ai/dsh-tools 的 ToolDefinition 真实契约。
  *
- * DeepSeek Harness 的 tools service 文档只给出 `ctx.tools.register(…)` 占位
- * （docs/user/develop/framework/service.md，详见 docs/dsh-integration.md）。
- * 为避免宿主微调签名导致插件不可用，这里按三种已知形态依序尝试；
- * 全部失败时抛出带现场信息的错误便于排查。
+ * 契约要点（dsh-tools lib/types/index.d.ts）：
+ *   register(definition: ToolDefinition): () => void
+ *   ToolDefinition = ToolSchema{ name, description, parameters } +
+ *     { output: { schema, render }, execute(args, exec), timeoutMs? }
+ * 模型可见面只有 name/description/parameters；output.render 决定结果如何投影为
+ * ContentBlock[]（此处统一文本投影）。
  */
-export function registerTools(tools: ToolRuntimeLike, defs: HarnessToolDef[]): void {
-  const target = tools as unknown as RegisterTarget;
-  const attempts: Array<() => void> = [
-    () => defs.forEach((d) => target.register(d)),
-    () => defs.forEach(({ name, ...rest }) => target.register(name, rest)),
-    () => defs.forEach((d) => (tools as any).add?.(d.name, d) ??
-      (tools as any).defineTool?.(d) ?? Promise.reject()),
-  ];
-  for (const attempt of attempts) {
-    try {
-      attempt();
-      return;
-    } catch {
-      // 尝试下一种形态
-    }
+
+import type { ToolDefinition } from '@deepseek-ai/dsh-tools';
+import type { PythonBridge } from './bridge.js';
+
+/** 工具协同超时要大于桥自身超时，保证超时由桥负责报错而不是被宿主先掐断。 */
+const TOOL_TIMEOUT_MS = 330_000;
+
+const MAX_RENDER_CHARS = 400_000;
+
+function textProjection(_args: unknown, value: unknown) {
+  let text = JSON.stringify(value);
+  if (text.length > MAX_RENDER_CHARS) {
+    text = text.slice(0, MAX_RENDER_CHARS) + '…[截断：结果过大，请缩小分析范围]';
   }
-  throw new Error('ctx.tools.register 形态无法识别：请更新 plugin-geocore/src/tools.ts 的适配层');
+  return [{ type: 'text' as const, text }];
 }
 
-export function buildToolDefs(bridge: PythonBridge): HarnessToolDef[] {
+const OBJECT_SCHEMA = { type: 'object' } as const;
+
+export function buildToolDefs(bridge: PythonBridge): ToolDefinition[] {
   return [
     {
       name: 'gis_inspect',
@@ -44,7 +35,7 @@ export function buildToolDefs(bridge: PythonBridge): HarnessToolDef[] {
         '输入：{path}（GeoJSON/GeoPackage/Shapefile/CSV+经纬度列）。',
         '返回：几何类型、CRS、范围、要素数、字段与样本值、数据质量告警（无效几何/缺 CRS）、可做的分析类别。',
       ].join('\n'),
-      inputSchema: {
+      parameters: {
         type: 'object',
         properties: {
           path: { type: 'string', description: '空间数据的绝对路径' },
@@ -52,7 +43,9 @@ export function buildToolDefs(bridge: PythonBridge): HarnessToolDef[] {
         required: ['path'],
         additionalProperties: true,
       },
+      output: { schema: OBJECT_SCHEMA, render: textProjection },
       execute: async (args) => bridge.call('inspect', args as Record<string, unknown>),
+      timeoutMs: TOOL_TIMEOUT_MS,
     },
     {
       name: 'gis_analyze',
@@ -70,12 +63,12 @@ export function buildToolDefs(bridge: PythonBridge): HarnessToolDef[] {
         '- overlay.clip {a, b}                    用 b 掩膜裁剪 a（只保留 a 属性）',
         '- zonal.summarize {regions, data, stats?, field?}      分区统计：点计数/属性和、线长度占比、面面积占比与按面积加权统计',
         '',
-        '规则：距离单位米、结果输出到 artifacts 目录并返回 artifact_id；',
+        '规则：距离单位米、结果输出到 artifacts 目录并返回 artifact_id。',
         '后续引用三种写法：@步骤id（同一请求内）、artifact_id（最终结果）、artifact_id#步骤id（持久化的中间步骤）。',
         '空结果是常见异常信号（过滤过严？CRS 不匹配？）；确属预期时给该步加 "allow_empty": true。',
         '永远不要自己算坐标或长度——一律通过本工具完成度量。',
       ].join('\n'),
-      inputSchema: {
+      parameters: {
         type: 'object',
         properties: {
           title: { type: 'string', description: '本次分析的人类可读标题' },
@@ -104,17 +97,19 @@ export function buildToolDefs(bridge: PythonBridge): HarnessToolDef[] {
         required: ['operations'],
         additionalProperties: true,
       },
-      execute: async (args) => bridge.call('analyze', args as Record<string, unknown>),
+      output: { schema: OBJECT_SCHEMA, render: textProjection },
+      execute: async (args, exec) => bridge.call('analyze', args as Record<string, unknown>, exec?.signal),
+      timeoutMs: TOOL_TIMEOUT_MS,
     },
     {
       name: 'gis_visualize',
       description: [
         '把分析结果表达成专题地图 PNG（分析归 gis_analyze，表达归本工具）。',
-        'source 可以是 artifact_id 或数据文件路径；style.mode ∈ single/point/categorical/choropleth。',
+        'source 可以是 artifact_id、artifact_id#步骤id 或数据文件路径；style.mode ∈ single/point/categorical/choropleth。',
         'choropleth 需要 style.field 为数值列，classification ∈ quantile/equal_interval。',
         '返回 image_path 与图例说明，可把路径展示给用户或继续引用。',
       ].join('\n'),
-      inputSchema: {
+      parameters: {
         type: 'object',
         properties: {
           source: { type: 'string', description: 'artifact_id 或数据集绝对路径' },
@@ -135,7 +130,9 @@ export function buildToolDefs(bridge: PythonBridge): HarnessToolDef[] {
         required: ['source'],
         additionalProperties: true,
       },
-      execute: async (args) => bridge.call('visualize', args as Record<string, unknown>),
+      output: { schema: OBJECT_SCHEMA, render: textProjection },
+      execute: async (args, exec) => bridge.call('visualize', args as Record<string, unknown>, exec?.signal),
+      timeoutMs: TOOL_TIMEOUT_MS,
     },
   ];
 }

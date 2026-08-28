@@ -1,5 +1,7 @@
 /** Shared protocol types mirrored from src/geocore/protocol.py. */
 
+import type { ToolDefinition } from '@deepseek-ai/dsh-tools';
+
 export interface WireError {
   code: string;
   message: string;
@@ -15,27 +17,11 @@ export interface Envelope<T = Record<string, unknown>> {
 export type GisAction = 'inspect' | 'analyze' | 'visualize' | 'show' | 'operations';
 
 /**
- * Harness `tools` service surface used by this plugin (best-effort contract
- * documented at deepseek-harness docs/user/develop/framework/subsystems/core.md;
- * see tools.ts for the shape-tolerant registration call).
+ * Harness 宿主提供的 tools service（dsh-tools ToolRuntime）。register 接受单个
+ * ToolDefinition 并返回反注册函数（lib/types/index.d.ts:603）。
  */
-export interface HarnessToolDef {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  execute: (args: Record<string, unknown>) => Promise<unknown>;
-}
-
 export interface ToolRuntimeLike {
-  register: ((def: HarnessToolDef) => unknown) &
-    ((name: string, def: Omit<HarnessToolDef, 'name'>) => unknown);
-}
-
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    /** Provided by the DeepSeek Harness host, not by cordis core itself. */
-    tools?: ToolRuntimeLike;
-  }
+  register(definition: ToolDefinition): () => void;
 }
 
 export interface GeoCorePluginConfig {

@@ -63,8 +63,9 @@ export class PythonBridge {
   async call<T = Record<string, unknown>>(
     action: GisAction,
     payload: Record<string, unknown> = {},
+    signal?: AbortSignal,
   ): Promise<T> {
-    const envelope = await this.rawCall(action, payload);
+    const envelope = await this.rawCall(action, payload, signal);
     if (!envelope.ok || envelope.error) {
       const err = envelope.error ?? { code: 'E_INTERNAL', message: 'empty envelope error' };
       throw new BridgeError(err.code, err.message, err.details);
@@ -72,7 +73,8 @@ export class PythonBridge {
     return envelope.result as T;
   }
 
-  private rawCall(action: GisAction, payload: Record<string, unknown>): Promise<Envelope> {
+  private rawCall(action: GisAction, payload: Record<string, unknown>,
+                  signal?: AbortSignal): Promise<Envelope> {
     // 可执行名通过白名单校验后，以参数数组 + shell:false 方式启动，无任何字符串拼接
     const executable = assertSafeExecutable(this.opts.pythonCmd);
     const pythonArgs = ['-m', 'geocore', 'run', '--workdir', this.opts.workdir];
@@ -88,7 +90,16 @@ export class PythonBridge {
       const chunks: Buffer[] = [];
       let bytes = 0;
       let timedOut = false;
+      let aborted = false;
       let oversized = false;
+
+      const abortListener = () => {
+        if (child.exitCode === null) {
+          aborted = true;
+          treeKill(child.pid);
+        }
+      };
+      signal?.addEventListener('abort', abortListener, { once: true });
 
       const timer = setTimeout(() => {
         timedOut = true;
@@ -97,6 +108,7 @@ export class PythonBridge {
 
       const finish = (fn: () => void) => {
         clearTimeout(timer);
+        signal?.removeEventListener('abort', abortListener);
         fn();
       };
 
@@ -121,6 +133,10 @@ export class PythonBridge {
           { hint: '请检查插件配置的 pythonCmd 是否指向可用的解释器' }))));
 
       child.on('close', (code) => {
+        if (aborted) {
+          return finish(() => reject(new BridgeError('E_BRIDGE_ABORTED',
+            'GeoCore 调用被取消信号终止', { action })));
+        }
         if (timedOut) {
           return finish(() => reject(new BridgeError('E_BRIDGE_TIMEOUT',
             `GeoCore 调用超时（>${this.opts.timeoutMs} ms）已被终止`,
