@@ -84,7 +84,7 @@ function buildFactoryModule(): FactoryModule {
     const probeAndOpen = (): void => {
       if (probing) return
       probing = true
-      styleButton('… 探测中')
+      styleButton('…')
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
       fetch(PROBE_URL, { signal: controller.signal, cache: 'no-store' })
@@ -99,7 +99,7 @@ function buildFactoryModule(): FactoryModule {
         .finally(() => {
           clearTimeout(timer)
           probing = false
-          styleButton(open ? '✕ 收起地图' : '🗺 GeoCore 地图')
+          styleButton(open ? '✕' : '🗺')
         })
     }
 
@@ -113,13 +113,13 @@ function buildFactoryModule(): FactoryModule {
       overlay.iframe.style.display = serviceUp ? 'block' : 'none'
       if (serviceUp && !overlay.iframe.src) overlay.iframe.src = STUDIO_URL
       open = true
-      styleButton('✕ 收起地图')
+      styleButton('✕')
     }
 
     const hideOverlay = (): void => {
       if (overlay) overlay.root.style.display = 'none'
       open = false
-      styleButton('🗺 GeoCore 地图')
+      styleButton('🗺')
     }
 
     const mount = (): (() => void) => {
@@ -130,23 +130,26 @@ function buildFactoryModule(): FactoryModule {
       btn = document.createElement('button')
       btn.id = 'geocore-studio-launcher'
       btn.type = 'button'
-      btn.textContent = '🗺 GeoCore 地图'
-      btn.title = '在 DSH 内展开/收起 GeoCore Studio 地图工作台'
+      btn.textContent = '🗺'
+      btn.title = 'GeoCore 地图工作台（点击展开 / 收起）'
       Object.assign(btn.style, {
         position: 'fixed',
-        right: '20px',
-        bottom: '20px',
+        top: '12px',
+        right: '16px',
         zIndex: '2147483647',
-        padding: '10px 18px',
+        width: '40px',
+        height: '40px',
+        padding: '0',
         border: 'none',
-        borderRadius: '999px',
+        borderRadius: '50%',
         background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
         color: '#fff',
-        fontSize: '14px',
-        fontFamily: '"Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
-        fontWeight: '600',
+        fontSize: '18px',
+        lineHeight: '40px',
+        textAlign: 'center',
+        fontFamily: '"Segoe UI Emoji", "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
         cursor: 'pointer',
-        boxShadow: '0 6px 20px rgba(37, 99, 235, 0.45)',
+        boxShadow: '0 4px 14px rgba(37, 99, 235, 0.45)',
         transition: 'transform .15s ease, box-shadow .15s ease',
       })
       btn.addEventListener('mouseenter', () => {
