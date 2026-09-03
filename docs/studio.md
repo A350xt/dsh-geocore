@@ -4,6 +4,16 @@
 > 标签页 B（Agent 对话）：真实 DSH 大脑（dsh-base + 你配置的模型），自然语言驱动全部 GIS 原语。
 > 两个标签页共享同一份 datasets 与 artifacts——对话产生的结果一键上图，地图上的操作产出 Agent 可引用的 artifact。
 
+## 与 DSH 主界面的同标签页切换
+
+DSH Web 主界面右下角有 **「🗺 GeoCore 地图」** 悬浮按钮（由本包的 `dsh.client`
+客户端覆盖层注入），点击后**同一个浏览器标签页**切换到 Studio；
+Studio 顶栏随之出现 **「↩ 返回 DSH」** 按钮，点击切回 DSH 对话界面。
+往返地址通过 `?from=` 参数 + sessionStorage 记忆（直接打开 4173 时不显示返回按钮）。
+
+> 注：悬浮按钮跳转地址固定为 `http://127.0.0.1:4173`（与插件配置端口一致）；
+> 改端口需同步改 `client/index.ts` 的 STUDIO_URL 并重新构建。
+
 ## 架构
 
 ```text

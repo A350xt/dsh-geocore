@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "description": "GeoCore Studio: 地图优先 + DSH Agent 对话双标签页表面（dsh profile 插件）",
+  "exports": {
+    ".": "./dist/studio-plugin.mjs",
+    "./client": "./dist/studio-client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  },
   "scripts": {
     "build": "node esbuild.mjs",
     "check": "tsc --noEmit"

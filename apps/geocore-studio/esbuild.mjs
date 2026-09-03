@@ -45,14 +45,29 @@ const web = {
   logLevel: 'info',
 }
 
+/** DSH Web 主界面的客户端覆盖层（经典脚本，注册 window.__ModuleLoader__ 工厂）。 */
+const clientOverlay = {
+  entryPoints: [path.join(HERE, 'client/index.ts')],
+  outfile: path.join(HERE, 'dist/studio-client.js'),
+  bundle: true,
+  platform: 'browser',
+  format: 'iife',
+  target: 'es2022',
+  sourcemap: false,
+  minify: false,
+  logLevel: 'info',
+}
+
 if (watch) {
   const p = await context(plugin)
   const w = await context(web)
-  await Promise.all([p.watch(), w.watch()])
+  const c = await context(clientOverlay)
+  await Promise.all([p.watch(), w.watch(), c.watch()])
   console.log('watching...')
 } else {
   await build(plugin)
   await build(web)
+  await build(clientOverlay)
   copyFileSync(path.join(HERE, 'web/index.html'), path.join(HERE, 'web-dist/index.html'))
   console.log('studio build done')
 }

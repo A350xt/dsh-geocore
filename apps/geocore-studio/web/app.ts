@@ -12,6 +12,25 @@ async function main(): Promise<void> {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab as 'map' | 'chat'))
   }
 
+  // DSH ⇄ Studio 同标签页往返：携带 ?from= 记住来源页，供"返回 DSH"按钮使用
+  const fromParam = new URLSearchParams(location.search).get('from')
+  if (fromParam && /^https?:\/\//i.test(fromParam)) {
+    try {
+      sessionStorage.setItem('geocore.dshUrl', fromParam)
+    } catch { /* 隐私模式等场景忽略 */ }
+  }
+  let dshUrl: string | null = null
+  try {
+    dshUrl = sessionStorage.getItem('geocore.dshUrl')
+  } catch { /* ignore */ }
+  const backBtn = document.getElementById('btn-back-dsh')
+  if (backBtn && dshUrl) {
+    backBtn.classList.remove('hidden')
+    backBtn.addEventListener('click', () => {
+      location.href = dshUrl as string
+    })
+  }
+
   initMapView()
   initOpsBar()
   initChatView()
