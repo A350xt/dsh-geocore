@@ -27,6 +27,13 @@ geocore Python 内核（无状态，read/list 为 Studio 扩展动作）
 
 ## 启动
 
+**方式一（推荐）：挂进 DSH web profile，随 DSH 一起启动。**
+`~/.dsh/profiles/web/cordis.patch.yml` 已插入 geocore-studio 条目——正常启动你的 DSH 后，
+浏览器另开一个标签页访问 **http://127.0.0.1:4173** 即可（DSH 聊天界面的 gis 工具与
+Studio 页面同源同进程，共享 artifacts；端口被占用时仅告警，不影响 DSH 本体）。
+
+**方式二：独立启动（不跑完整 DSH web）。**
+
 ```bash
 # 0) 前置：geocore 已 pip install -e .；profile 已建好（见下）
 # 1) 构建（改代码后需要）

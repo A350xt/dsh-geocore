@@ -241,6 +241,14 @@ export function startStudioServer(
     }
   })
 
+  // 端口被占用等监听错误只降级为告警：绝不拖垮宿主（DSH web）启动
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    const logger = (ctx as any).logger
+    const line = `geocore-studio: HTTP 服务启动失败（${err.code ?? ''} ${err.message}）——地图界面不可用，其余功能不受影响`
+    if (logger) logger('warn', line)
+    else console.warn(line)
+  })
+
   server.listen(port, host, () => {
     const logger = (ctx as any).logger
     const line = `geocore-studio: http://${host}:${port} （地图 + Agent 双标签页）`
