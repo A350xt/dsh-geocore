@@ -1,4 +1,4 @@
-/** Studio HTTP 服务：REST + 聊天流 + 静态前端。默认仅绑定本机回环。 */
+/** Studio HTTP 服务：REST + 静态前端。默认仅绑定本机回环。 */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
@@ -6,7 +6,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PythonBridge } from '../../../plugin-geocore/src/bridge.js'
-import type { StudioAgent } from './agent.js'
 
 export interface StudioConfig {
   /** 监听端口，默认 4173。 */
@@ -88,7 +87,6 @@ export function startStudioServer(
   ctx: Context,
   config: StudioConfig,
   bridge: PythonBridge,
-  agent: StudioAgent,
 ): () => void {
   const port = config.port ?? 4173
   const host = config.host ?? '127.0.0.1'
@@ -155,32 +153,6 @@ export function startStudioServer(
   const server: Server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
     try {
-      // ---- 聊天：ndjson 流 ----
-      if (req.method === 'POST' && url.pathname === '/api/chat') {
-        const body = await readBody(req)
-        const text = String(body.text ?? '')
-        if (!text.trim()) {
-          json(res, 400, errBody(new Error('text 不能为空')))
-          return
-        }
-        res.writeHead(200, {
-          'Content-Type': 'application/x-ndjson; charset=utf-8',
-          'Cache-Control': 'no-store',
-          'X-Accel-Buffering': 'no',
-        })
-        const write = (obj: unknown): void => {
-          res.write(JSON.stringify(obj) + '\n')
-        }
-        try {
-          await agent.send(text, (ev) => write(ev))
-        } catch (exc) {
-          write({ type: 'studio/error', data: { message: (exc as Error).message } })
-        }
-        write({ type: 'studio/done' })
-        res.end()
-        return
-      }
-
       // ---- REST ----
       if (url.pathname === '/api/config' && req.method === 'GET') {
         // 允许 DSH Web 页面（不同源）探活：只暴露只读运行信息
@@ -194,8 +166,6 @@ export function startStudioServer(
           result: {
             workdir: workdirReal,
             datasetsDir: datasetsReal,
-            model: agent.model,
-            agentReady: agent.ready,
           },
         }))
         return
@@ -205,7 +175,7 @@ export function startStudioServer(
         const result = await bridge.call('list', {
           datasets_dir: datasetsReal ?? '',
         })
-        json(res, 200, { ok: true, result: { ...result, model: agent.model } })
+        json(res, 200, { ok: true, result })
         return
       }
 
@@ -257,7 +227,7 @@ export function startStudioServer(
 
   server.listen(port, host, () => {
     const logger = (ctx as any).logger
-    const line = `geocore-studio: http://${host}:${port} （地图 + Agent 双标签页）`
+    const line = `geocore-studio: http://${host}:${port} （地图工作台）`
     if (logger) logger('info', line)
     else console.log(line)
   })

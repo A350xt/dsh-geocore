@@ -6,7 +6,7 @@ Agent 只见 3 个工具；内核由七类 GIS 原语治理；底层引擎可整
 > 项目目标：让 Harness 通过极少数工具组合解决通用 2D 矢量分析任务，
 > 并以 benchmark（而非主观判断）证明覆盖率。
 > 当前状态：**Phase 1 Vector Core 完成**（见下方路线图），
-> 外加 **GeoCore Studio 双标签页工作台**（地图优先 + 真实 DSH Agent 对话）。
+> 外加 **GeoCore Studio 地图工作台**（DSH 风格 GIS 界面；自然语言对话由 DSH 主界面承担）。
 
 ## 快速开始
 
@@ -52,9 +52,9 @@ DSH-GIS/
 │   └── viz/                #   matplotlib 专题图（离线中文字体）
 ├── plugin-geocore/         # DeepSeek Harness 插件（TypeScript/cordis v4）
 │   └── src/{bridge,service,tools,index}.ts
-├── apps/geocore-studio/    # GeoCore Studio：双标签页工作台（dsh profile 插件）
-│   ├── src/                #   服务插件：REST + 聊天流 + 交互式 DSH Agent
-│   └── web/                #   前端：Leaflet 地图工作台 + Agent 对话
+├── apps/geocore-studio/    # GeoCore Studio：地图工作台（dsh profile 插件）
+│   ├── src/                #   服务插件：REST + 静态前端（DSH 风格主题）
+│   └── web/                #   前端：Leaflet 图层树 + 六种可视化操作
 ├── scripts/                # 合成数据生成、选址端到端演示
 ├── tests/                  # pytest 全套 + bench/starter.jsonl 基准题集
 └── docs/                   # 架构 / 工具契约 / Harness 接入 / Studio 指南
@@ -81,7 +81,7 @@ DSH-GIS/
 - [架构总览](docs/architecture.md) —— 三层结构、可靠性铁律、Artifact 设计、已知边界
 - [工具 API 契约](docs/tool-api.md)
 - [DeepSeek Harness 集成指南](docs/dsh-integration.md)
-- [GeoCore Studio 指南](docs/studio.md) —— 双标签页工作台的架构、启动与使用
+- [GeoCore Studio 指南](docs/studio.md) —— 地图工作台的架构、启动与使用
 
 ## 许可
 

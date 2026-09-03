@@ -37,40 +37,6 @@ export function apiPost<T>(path: string, body: unknown): Promise<T> {
   })
 }
 
-/** 聊天流：POST ndjson，逐行回调事件对象。 */
-export async function chatStream(
-  text: string,
-  onEvent: (ev: any) => void,
-): Promise<void> {
-  const res = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
-  })
-  if (!res.ok || !res.body) {
-    throw { code: 'E_HTTP', message: `聊天连接失败 HTTP ${res.status}` }
-  }
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    let nl: number
-    while ((nl = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, nl).trim()
-      buffer = buffer.slice(nl + 1)
-      if (!line) continue
-      try {
-        onEvent(JSON.parse(line))
-      } catch {
-        // 忽略无法解析的行
-      }
-    }
-  }
-}
-
 // ---------------- 数据形状 ----------------
 
 export interface DatasetEntry {
@@ -96,7 +62,6 @@ export interface ArtifactEntry {
 export interface Inventory {
   datasets: DatasetEntry[]
   artifacts: ArtifactEntry[]
-  model?: string
 }
 
 export interface ReadResult {

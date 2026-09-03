@@ -1,17 +1,11 @@
-/** GeoCore Studio 前端入口。 */
+/** GeoCore Studio 前端入口：单页地图工作台（Agent 对话由 DSH 主界面承担）。 */
 
 import './ui.css'
-import { switchTab } from './state.js'
 import { initMapView, mapView } from './mapview.js'
 import { initOpsBar } from './ops.js'
-import { initChatView } from './chatview.js'
 import { apiGet } from './api.js'
 
 async function main(): Promise<void> {
-  for (const btn of document.querySelectorAll<HTMLButtonElement>('.tab')) {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab as 'map' | 'chat'))
-  }
-
   // DSH ⇄ Studio 同标签页往返：携带 ?from= 记住来源页，供"返回 DSH"按钮使用
   const fromParam = new URLSearchParams(location.search).get('from')
   if (fromParam && /^https?:\/\//i.test(fromParam)) {
@@ -33,19 +27,13 @@ async function main(): Promise<void> {
 
   initMapView()
   initOpsBar()
-  initChatView()
-
-  // 深链支持：?tab=map|chat（供测试/书签直达指定标签页）
-  const tabParam = new URLSearchParams(location.search).get('tab')
-  if (tabParam === 'chat' || tabParam === 'map') switchTab(tabParam)
 
   // 内核健康检查
   try {
-    const cfg = await apiGet<{ workdir: string; datasetsDir: string | null; model: string }>('/api/config')
+    const cfg = await apiGet<{ workdir: string; datasetsDir: string | null }>('/api/config')
     const dot = document.getElementById('bridge-status')!
     dot.classList.add('ok')
     dot.title = `geocore 内核就绪 · workdir=${cfg.workdir}`
-    if (cfg.model) document.getElementById('model-badge')!.textContent = cfg.model
   } catch {
     const dot = document.getElementById('bridge-status')!
     dot.classList.add('bad')

@@ -4,6 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GeoCore Studio</title>
+  <script>
+    // 主题先行（避免闪白）：?theme=dark|light 显式指定，缺省跟随系统
+    (function () {
+      var t = new URLSearchParams(location.search).get('theme')
+      if (t !== 'dark' && t !== 'light') {
+        t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      }
+      document.documentElement.dataset.theme = t
+    })()
+  </script>
   <link rel="stylesheet" href="./app.css" />
 </head>
 <body>
@@ -11,21 +21,16 @@
     <div class="brand">
       <span class="brand-mark">◈</span>
       <span class="brand-name">GeoCore Studio</span>
-      <span class="brand-sub" id="model-badge"></span>
+      <span class="brand-sub">地图工作台</span>
     </div>
-    <nav class="tabs" role="tablist">
-      <button class="tab active" id="tab-btn-map" data-tab="map" role="tab">🗺 地图工作台</button>
-      <button class="tab" id="tab-btn-chat" data-tab="chat" role="tab">🤖 Agent 对话</button>
-    </nav>
     <div class="top-actions">
-      <button id="btn-back-dsh" class="back-dsn hidden" title="返回 DSH 对话界面">↩ 返回 DSH</button>
+      <button id="btn-back-dsh" class="ghost-pill hidden" title="返回 DSH 对话界面">↩ 返回 DSH</button>
       <span id="bridge-status" class="status-dot" title="Python 内核状态">●</span>
     </div>
   </header>
 
   <main>
-    <!-- ================= 标签页 A：地图工作台 ================= -->
-    <section id="panel-map" class="panel active" role="tabpanel">
+    <section id="panel-map" role="tabpanel">
       <aside id="layer-panel">
         <div class="layer-panel-head">
           <span>图层</span>
@@ -62,28 +67,6 @@
           <button id="result-close" class="icon-btn">✕</button>
         </div>
         <div id="result-body"></div>
-      </div>
-    </section>
-
-    <!-- ================= 标签页 B：Agent 对话 ================= -->
-    <section id="panel-chat" class="panel" role="tabpanel">
-      <div id="chat-col">
-        <div id="chat-messages">
-          <div class="chat-welcome">
-            <h3>GeoCore Agent</h3>
-            <p>用自然语言提出空间问题，Agent 会组合 gis_inspect / gis_analyze / gis_visualize
-              完成查询、缓冲、叠加、分区统计并制图；产物可一键加入「地图工作台」查看。</p>
-            <ul class="chat-samples">
-              <li><button class="sample">主干道 2 公里内、避开洪水区、面积大于 1 平方公里的地块有哪些？</button></li>
-              <li><button class="sample">每个区有多少家医院、床位总数是多少？</button></li>
-              <li><button class="sample">先 inspect 地块数据，再按用地类型做统计并出一张专题图</button></li>
-            </ul>
-          </div>
-        </div>
-        <div id="chat-input-row">
-          <textarea id="chat-input" rows="2" placeholder="描述你的空间分析任务…（Enter 发送，Shift+Enter 换行）"></textarea>
-          <button id="chat-send" class="send-btn">发送</button>
-        </div>
       </div>
     </section>
   </main>

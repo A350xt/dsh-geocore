@@ -1,10 +1,13 @@
 /**
  * GeoCore Studio 客户端覆盖层：把 GIS 工作台嵌入 DSH Web 主界面。
  *
- * 行为：右下角悬浮按钮「🗺 GeoCore 地图」在 DSH 页面内铺开一个全屏嵌入层
- * （iframe 加载 Studio 服务），再次点击收起——DSH 会话状态原地保留，
- * 不发生页面导航。展开前先对 Studio 服务探活（GET /api/config），
- * 服务未启动时显示提示而非空白。
+ * 行为：右上角悬浮按钮（🗺）在 DSH 页面内铺开一个全屏嵌入层（iframe 加载
+ * Studio 服务），再次点击收起——DSH 会话状态原地保留，不发生页面导航。
+ * 展开前先对 Studio 服务探活（GET /api/config），服务未启动时显示提示而非空白。
+ *
+ * 风格：按钮直接引用 DSH 宿主页面的 --dsw-alias-* 设计令牌（带回退值），
+ * 自动跟随 DSH 亮/暗主题；展开时读取 body[data-ds-dark-theme] 把主题
+ * 透传给 Studio（iframe ?theme=dark|light）。
  *
  * 打包协议（对齐 @deepseek-ai 客户端包产物）：
  * 经典脚本执行时向 window.__ModuleLoader__ 注册 {id, factory}；
@@ -14,6 +17,16 @@
 const STUDIO_URL = 'http://127.0.0.1:4173/'
 const PROBE_URL = `${STUDIO_URL}api/config`
 const PROBE_TIMEOUT_MS = 4000
+
+/** DSH 用 body[data-ds-dark-theme] 标记暗色主题。 */
+function hostTheme(): 'dark' | 'light' {
+  return document.body?.hasAttribute('data-ds-dark-theme') ? 'dark' : 'light'
+}
+
+/** Studio 入口地址（带主题参数，主题切换后重开即生效）。 */
+function studioUrl(): string {
+  return `${STUDIO_URL}?theme=${hostTheme()}`
+}
 
 interface FactoryModule {
   exports: Record<string, unknown>
@@ -26,14 +39,13 @@ function createOverlay(): { root: HTMLDivElement; iframe: HTMLIFrameElement; hin
     position: 'fixed',
     inset: '0',
     zIndex: '2147483000',
-    background: '#f1f5f9',
+    background: 'var(--dsw-alias-bg-base, #ffffff)',
     display: 'flex',
     flexDirection: 'column',
   })
 
   const iframe = document.createElement('iframe')
   iframe.title = 'GeoCore Studio 地图工作台'
-  iframe.src = STUDIO_URL
   Object.assign(iframe.style, {
     flex: '1',
     width: '100%',
@@ -46,12 +58,14 @@ function createOverlay(): { root: HTMLDivElement; iframe: HTMLIFrameElement; hin
   Object.assign(hint.style, {
     margin: 'auto',
     padding: '28px 36px',
-    background: '#fff',
+    background: 'var(--dsw-alias-bg-layer-2, #ffffff)',
+    border: '1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.1))',
     borderRadius: '12px',
     boxShadow: '0 8px 28px rgba(15,23,42,.16)',
-    fontFamily: '"Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
+    fontFamily:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
     fontSize: '14px',
-    color: '#334155',
+    color: 'var(--dsw-alias-label-secondary, #334155)',
     lineHeight: '1.8',
     display: 'none',
     textAlign: 'center',
@@ -76,8 +90,7 @@ function buildFactoryModule(): FactoryModule {
     let probing = false
 
     const styleButton = (text: string): void => {
-      if (!btn) return
-      btn.textContent = text
+      if (btn) btn.textContent = text
     }
 
     /** 展开前探活：服务在线才挂 iframe，否则显示提示。 */
@@ -89,11 +102,7 @@ function buildFactoryModule(): FactoryModule {
       const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
       fetch(PROBE_URL, { signal: controller.signal, cache: 'no-store' })
         .then((res) => {
-          if (res.ok) {
-            showOverlay(true)
-          } else {
-            showOverlay(false)
-          }
+          showOverlay(res.ok)
         })
         .catch(() => showOverlay(false))
         .finally(() => {
@@ -111,7 +120,8 @@ function buildFactoryModule(): FactoryModule {
       overlay.root.style.display = 'flex'
       overlay.hint.style.display = serviceUp ? 'none' : 'block'
       overlay.iframe.style.display = serviceUp ? 'block' : 'none'
-      if (serviceUp && !overlay.iframe.src) overlay.iframe.src = STUDIO_URL
+      // 每次展开按当前 DSH 主题取地址；主题变化后重开会自动刷新
+      if (serviceUp) overlay.iframe.src = studioUrl()
       open = true
       styleButton('✕')
     }
@@ -132,6 +142,7 @@ function buildFactoryModule(): FactoryModule {
       btn.type = 'button'
       btn.textContent = '🗺'
       btn.title = 'GeoCore 地图工作台（点击展开 / 收起）'
+      // 复用 DSH 宿主的设计令牌：跟随其亮/暗主题与品牌色，缺省回退到亮色值
       Object.assign(btn.style, {
         position: 'fixed',
         top: '12px',
@@ -140,28 +151,28 @@ function buildFactoryModule(): FactoryModule {
         width: '40px',
         height: '40px',
         padding: '0',
-        border: 'none',
-        borderRadius: '50%',
-        background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-        color: '#fff',
+        border: '1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.1))',
+        borderRadius: '12px',
+        background: 'var(--dsw-alias-bg-layer-2, #ffffff)',
+        color: 'var(--dsw-alias-state-business-primary, #4176e6)',
         fontSize: '18px',
-        lineHeight: '40px',
+        lineHeight: '38px',
         textAlign: 'center',
         fontFamily: '"Segoe UI Emoji", "Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
         cursor: 'pointer',
-        boxShadow: '0 4px 14px rgba(37, 99, 235, 0.45)',
-        transition: 'transform .15s ease, box-shadow .15s ease',
+        boxShadow: '0 2px 10px rgba(15, 17, 21, .12)',
+        transition: 'background .15s ease, transform .15s ease',
       })
       btn.addEventListener('mouseenter', () => {
         if (btn) {
-          btn.style.transform = 'translateY(-2px)'
-          btn.style.boxShadow = '0 10px 26px rgba(37, 99, 235, 0.55)'
+          btn.style.background = 'var(--dsw-alias-interactive-bg-hover, rgba(38,49,72,.06))'
+          btn.style.transform = 'translateY(-1px)'
         }
       })
       btn.addEventListener('mouseleave', () => {
         if (btn) {
+          btn.style.background = 'var(--dsw-alias-bg-layer-2, #ffffff)'
           btn.style.transform = 'none'
-          btn.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.45)'
         }
       })
       btn.addEventListener('click', () => {

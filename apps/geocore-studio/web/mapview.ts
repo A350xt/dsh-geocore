@@ -3,7 +3,7 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { apiGet, apiPost, type Inventory, type ReadResult } from './api.js'
-import { fmtBytes, h, switchTab, toast, type SourceOption } from './state.js'
+import { fmtBytes, h, toast, type SourceOption } from './state.js'
 
 interface LayerEntry {
   key: string
@@ -191,8 +191,6 @@ class MapView {
   async refreshInventory(): Promise<void> {
     try {
       this.inventory = await apiGet<Inventory>('/api/inventory')
-      const badge = document.getElementById('model-badge')
-      if (badge && this.inventory.model) badge.textContent = this.inventory.model
       this.renderTree()
     } catch (exc: any) {
       document.getElementById('layer-tree')!.innerHTML =
@@ -344,7 +342,6 @@ class MapView {
 
   /** 聊天卡片“在地图中查看”入口。 */
   async viewArtifact(artifactId: string, step?: string): Promise<void> {
-    switchTab('map')
     await this.refreshInventory()
     const source = step ? `${artifactId}#${step}` : artifactId
     await this.addLayer(source)
