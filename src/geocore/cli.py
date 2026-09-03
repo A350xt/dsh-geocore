@@ -3,7 +3,7 @@
 Usage:
     echo '{"action":"inspect","path":"..."}' | python -m geocore run --workdir D:/tmp/gis
 
-Actions: inspect | analyze | visualize | show | operations
+Actions: inspect | analyze | visualize | show | operations | read | list
 """
 
 from __future__ import annotations
@@ -54,6 +54,10 @@ def main(argv: list[str] | None = None) -> int:
             result = api.show(workdir, payload.get("artifact_id"))
         elif action == "operations":
             result = api.list_operations()
+        elif action == "read":
+            result = api.read_layer(workdir, payload)
+        elif action == "list":
+            result = api.list_inventory(workdir, payload)
         else:
             from geocore.protocol import error_envelope
 

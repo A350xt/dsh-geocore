@@ -22,6 +22,12 @@ from geocore.runtime.prepare import assume_missing_crs, estimate_utm, repair_geo
 _STEP_REF_RE = re.compile(r"\A(ar_[A-Za-z0-9]{10,32})#([A-Za-z0-9_]{1,32})\Z")
 
 
+def parse_step_ref(token: str):
+    """`ar_xxx#stepId` → (artifact_id, step_id)；否则 None。"""
+    m = _STEP_REF_RE.fullmatch(str(token))
+    return (m.group(1), m.group(2)) if m else None
+
+
 class DatasetResolver:
     def __init__(self, store):
         self.store = store

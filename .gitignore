@@ -15,7 +15,13 @@ plugin-geocore/lib/
 .tmp-probe/
 tmp-smoke/
 datasets/demo_out/
+dsh-work/
 artifacts/
+
+# 构建产物
+plugin-geocore/lib/
+apps/geocore-studio/dist/
+apps/geocore-studio/web-dist/
 
 # 环境
 .env
