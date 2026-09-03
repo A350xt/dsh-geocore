@@ -183,7 +183,13 @@ export function startStudioServer(
 
       // ---- REST ----
       if (url.pathname === '/api/config' && req.method === 'GET') {
-        json(res, 200, {
+        // 允许 DSH Web 页面（不同源）探活：只暴露只读运行信息
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'Access-Control-Allow-Origin': '*',
+        })
+        res.end(JSON.stringify({
           ok: true,
           result: {
             workdir: workdirReal,
@@ -191,7 +197,7 @@ export function startStudioServer(
             model: agent.model,
             agentReady: agent.ready,
           },
-        })
+        }))
         return
       }
 

@@ -1,8 +1,10 @@
 /**
- * GeoCore Studio 客户端覆盖层：在 DSH Web 主界面注入悬浮切换按钮。
+ * GeoCore Studio 客户端覆盖层：把 GIS 工作台嵌入 DSH Web 主界面。
  *
- * 点击后**同一浏览器标签页**导航到 Studio 地图工作台，并携带 ?from= 记录
- * 当前 DSH 页面地址，Studio 侧据此显示"返回 DSH"按钮。
+ * 行为：右下角悬浮按钮「🗺 GeoCore 地图」在 DSH 页面内铺开一个全屏嵌入层
+ * （iframe 加载 Studio 服务），再次点击收起——DSH 会话状态原地保留，
+ * 不发生页面导航。展开前先对 Studio 服务探活（GET /api/config），
+ * 服务未启动时显示提示而非空白。
  *
  * 打包协议（对齐 @deepseek-ai 客户端包产物）：
  * 经典脚本执行时向 window.__ModuleLoader__ 注册 {id, factory}；
@@ -10,9 +12,55 @@
  */
 
 const STUDIO_URL = 'http://127.0.0.1:4173/'
+const PROBE_URL = `${STUDIO_URL}api/config`
+const PROBE_TIMEOUT_MS = 4000
 
 interface FactoryModule {
   exports: Record<string, unknown>
+}
+
+function createOverlay(): { root: HTMLDivElement; iframe: HTMLIFrameElement; hint: HTMLDivElement } {
+  const root = document.createElement('div')
+  root.id = 'geocore-studio-overlay'
+  Object.assign(root.style, {
+    position: 'fixed',
+    inset: '0',
+    zIndex: '2147483000',
+    background: '#f1f5f9',
+    display: 'flex',
+    flexDirection: 'column',
+  })
+
+  const iframe = document.createElement('iframe')
+  iframe.title = 'GeoCore Studio 地图工作台'
+  iframe.src = STUDIO_URL
+  Object.assign(iframe.style, {
+    flex: '1',
+    width: '100%',
+    border: 'none',
+    background: '#fff',
+  })
+
+  const hint = document.createElement('div')
+  hint.id = 'geocore-studio-hint'
+  Object.assign(hint.style, {
+    margin: 'auto',
+    padding: '28px 36px',
+    background: '#fff',
+    borderRadius: '12px',
+    boxShadow: '0 8px 28px rgba(15,23,42,.16)',
+    fontFamily: '"Segoe UI", "Microsoft YaHei", system-ui, sans-serif',
+    fontSize: '14px',
+    color: '#334155',
+    lineHeight: '1.8',
+    display: 'none',
+    textAlign: 'center',
+  })
+  hint.textContent =
+    'GeoCore Studio 服务未响应（127.0.0.1:4173）。请确认 DSH 已随 geocore-studio 插件启动后重试。'
+
+  root.append(iframe, hint)
+  return { root, iframe, hint }
 }
 
 function buildFactoryModule(): FactoryModule {
@@ -23,16 +71,67 @@ function buildFactoryModule(): FactoryModule {
 
   exports.apply = (_ctx: unknown): (() => void) => {
     let btn: HTMLButtonElement | null = null
+    let overlay: { root: HTMLDivElement; iframe: HTMLIFrameElement; hint: HTMLDivElement } | null = null
+    let open = false
+    let probing = false
+
+    const styleButton = (text: string): void => {
+      if (!btn) return
+      btn.textContent = text
+    }
+
+    /** 展开前探活：服务在线才挂 iframe，否则显示提示。 */
+    const probeAndOpen = (): void => {
+      if (probing) return
+      probing = true
+      styleButton('… 探测中')
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
+      fetch(PROBE_URL, { signal: controller.signal, cache: 'no-store' })
+        .then((res) => {
+          if (res.ok) {
+            showOverlay(true)
+          } else {
+            showOverlay(false)
+          }
+        })
+        .catch(() => showOverlay(false))
+        .finally(() => {
+          clearTimeout(timer)
+          probing = false
+          styleButton(open ? '✕ 收起地图' : '🗺 GeoCore 地图')
+        })
+    }
+
+    const showOverlay = (serviceUp: boolean): void => {
+      if (!overlay) overlay = createOverlay()
+      if (!document.getElementById('geocore-studio-overlay')) {
+        document.body.appendChild(overlay.root)
+      }
+      overlay.root.style.display = 'flex'
+      overlay.hint.style.display = serviceUp ? 'none' : 'block'
+      overlay.iframe.style.display = serviceUp ? 'block' : 'none'
+      if (serviceUp && !overlay.iframe.src) overlay.iframe.src = STUDIO_URL
+      open = true
+      styleButton('✕ 收起地图')
+    }
+
+    const hideOverlay = (): void => {
+      if (overlay) overlay.root.style.display = 'none'
+      open = false
+      styleButton('🗺 GeoCore 地图')
+    }
 
     const mount = (): (() => void) => {
-      const existing = document.getElementById('geocore-studio-launcher')
-      if (existing) return () => existing.remove()
+      if (document.getElementById('geocore-studio-launcher')) {
+        return () => document.getElementById('geocore-studio-launcher')?.remove()
+      }
 
       btn = document.createElement('button')
       btn.id = 'geocore-studio-launcher'
       btn.type = 'button'
       btn.textContent = '🗺 GeoCore 地图'
-      btn.title = '切换到 GeoCore Studio 地图工作台（本标签页内来回切换）'
+      btn.title = '在 DSH 内展开/收起 GeoCore Studio 地图工作台'
       Object.assign(btn.style, {
         position: 'fixed',
         right: '20px',
@@ -63,11 +162,17 @@ function buildFactoryModule(): FactoryModule {
         }
       })
       btn.addEventListener('click', () => {
-        const from = encodeURIComponent(location.href)
-        location.href = `${STUDIO_URL}?from=${from}`
+        if (open) {
+          hideOverlay()
+        } else {
+          probeAndOpen()
+        }
       })
       document.body.appendChild(btn)
-      return () => btn?.remove()
+      return () => {
+        btn?.remove()
+        overlay?.root.remove()
+      }
     }
 
     if (document.body) return mount()
