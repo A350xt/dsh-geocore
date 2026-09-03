@@ -44,6 +44,7 @@ class ChatView {
     this.input.value = ''
 
     this.appendUser(text)
+    this.messages.querySelector('.chat-welcome')?.remove()
     this.streamBubbles.clear()
     this.toolCards.clear()
 

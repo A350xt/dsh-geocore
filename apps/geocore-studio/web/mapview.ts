@@ -107,7 +107,7 @@ class MapView {
     const t = feature?.geometry?.type ?? 'Point'
     const isLine = t.includes('LineString')
     const isPoint = t.includes('Point')
-    let color = isLine ? '#ef4444' : isPoint ? '#f59e0b' : '#3b82f6'
+    let color = isLine ? '#7c3aed' : isPoint ? '#f59e0b' : '#3b82f6'
     if (entry.styleMode !== 'none' && entry.styleField) {
       const v = feature?.properties?.[entry.styleField]
       if (entry.styleMode === 'categorical' && entry.categories) {

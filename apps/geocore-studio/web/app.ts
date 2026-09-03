@@ -35,6 +35,10 @@ async function main(): Promise<void> {
   initOpsBar()
   initChatView()
 
+  // 深链支持：?tab=map|chat（供测试/书签直达指定标签页）
+  const tabParam = new URLSearchParams(location.search).get('tab')
+  if (tabParam === 'chat' || tabParam === 'map') switchTab(tabParam)
+
   // 内核健康检查
   try {
     const cfg = await apiGet<{ workdir: string; datasetsDir: string | null; model: string }>('/api/config')

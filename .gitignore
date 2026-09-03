@@ -30,3 +30,6 @@ apps/geocore-studio/web-dist/
 # 本机会话/工具产物（与项目源码无关）
 .mimosa/
 .zcode/
+
+# 视觉评审临时截图
+tmp-visual/
