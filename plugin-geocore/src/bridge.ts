@@ -77,7 +77,9 @@ export class PythonBridge {
                   signal?: AbortSignal): Promise<Envelope> {
     // 可执行名通过白名单校验后，以参数数组 + shell:false 方式启动，无任何字符串拼接
     const executable = assertSafeExecutable(this.opts.pythonCmd);
-    const pythonArgs = ['-m', 'geocore', 'run', '--workdir', this.opts.workdir];
+    // -X utf8：子进程无论宿主 locale 如何都按 UTF-8 收发（中文 Windows 默认 GBK，
+    // 不加会出现中文参数/路径/标题乱码与 surrogates 错误）
+    const pythonArgs = ['-X', 'utf8', '-m', 'geocore', 'run', '--workdir', this.opts.workdir];
     const request = JSON.stringify({ action, ...payload });
 
     return new Promise<Envelope>((resolve, reject) => {
@@ -152,7 +154,11 @@ export class PythonBridge {
         if (!envelope) {
           return finish(() => reject(new BridgeError('E_BRIDGE_BROKEN_OUTPUT',
             `Python 进程未输出合法 JSON 封套（exit=${code}）`,
-            { stdout_head: text.slice(0, 600), stderr_tail: stderrTail })));
+            {
+              stdout_head: text.slice(0, 600),
+              stderr_tail: stderrTail,
+              fix_hints: diagnoseHints(text + stderrTail),
+            })));
         }
         finish(() => resolve(envelope));
       });
@@ -182,4 +188,25 @@ function parseLastEnvelope(text: string): Envelope | null {
     }
   }
   return null;
+}
+
+/** 从崩溃输出里提炼可行动的中文修复提示。 */
+function diagnoseHints(raw: string): string[] {
+  const hints: string[] = [];
+  const low = raw.toLowerCase();
+  if (low.includes('unicodeencodeerror') || low.includes('surrogate')) {
+    hints.push('出现编码错误：内核已按 UTF-8 运行（-X utf8），请确认数据文件本身的编码；'
+      + '如仍复现，把最小复现请求反馈给维护者');
+  }
+  if (raw.includes('ModuleNotFoundError') || low.includes('no module named')) {
+    hints.push('geocore 未安装或不在该解释器的 site-packages：在目标 Python 里执行 pip install -e .');
+  }
+  if (/\.gpkg|\.shp|\.geojson/i.test(raw) && /permission|being used by another process/i.test(low)) {
+    hints.push('文件被占用：请关闭正在用该数据集的其他程序（如 QGIS）后重试');
+  }
+  if (hints.length === 0) {
+    hints.push('常见排查：Windows 路径请用正斜杠 D:/x/y 或双反斜杠；'
+      + '中文参数与中文标题已支持 UTF-8；日期字段支持 ISO 8601');
+  }
+  return hints;
 }

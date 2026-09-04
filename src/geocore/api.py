@@ -8,7 +8,13 @@ from pathlib import Path
 import pandas as pd
 
 from geocore.analysis.executor import OP_HANDLERS, execute_analyze
-from geocore.protocol import E_BAD_REQUEST, E_INPUT_MISSING, E_OUTPUT_ERROR, GeoCoreError
+from geocore.protocol import (
+    E_BAD_REQUEST,
+    E_INPUT_MISSING,
+    E_OUTPUT_ERROR,
+    GeoCoreError,
+    json_safe,
+)
 from geocore.runtime.artifact import ArtifactStore
 from geocore.runtime.datasource import load_dataset
 from geocore.runtime.prepare import assume_missing_crs
@@ -32,8 +38,7 @@ def inspect(payload: dict) -> dict:
         if col in skip:
             continue
         series = gdf[col]
-        samples = [v.item() if hasattr(v, "item") else v
-                   for v in pd.unique(series.dropna())[:3]]
+        samples = [json_safe(v) for v in pd.unique(series.dropna())[:3]]
         fields.append({
             "name": str(col),
             "dtype": str(series.dtype),
@@ -83,6 +88,8 @@ def visualize(workdir: Path, payload: dict) -> dict:
     source = str(payload.get("source") or "")
     style = dict(payload.get("style") or {})
     title = str(payload.get("title") or style.get("title") or "GeoCore 地图")
+    base = payload.get("base")
+    base_style = dict(payload.get("base_style") or {}) if base else None
 
     store = ArtifactStore(Path(workdir))
 
@@ -94,11 +101,16 @@ def visualize(workdir: Path, payload: dict) -> dict:
     else:
         artifact_id, _ = store.create("map", title)
 
-    resolver = DatasetResolver(store)
+    # 制图保持源 CRS（避免坐标轴出现米制刻度）；多层仍自动对齐到首个输入
+    resolver = DatasetResolver(store, crs_override="source")
     gdf, _ = resolver.frame(source)
+    base_gdf = None
+    if base:
+        base_gdf, _ = resolver.frame(str(base))
 
     out_path = store.image_path_for(artifact_id, title)
-    legend = render_map(gdf, style=style, out_path=out_path, title=title)
+    legend = render_map(gdf, style=style, out_path=out_path, title=title,
+                        base_gdf=base_gdf, base_style=base_style)
 
     if not base_artifact:
         store.finalize_map(artifact_id, image=str(out_path), legend=legend,
@@ -201,6 +213,11 @@ def read_layer(workdir: Path, payload: dict) -> dict:
 
     if gdf.crs is not None and gdf.crs.is_projected:
         gdf = gdf.to_crs("EPSG:4326")
+
+    # datetime 列转 ISO 字符串：to_json 不处理 datetime64，会整包失败
+    for col in gdf.columns:
+        if pd.api.types.is_datetime64_any_dtype(gdf[col]):
+            gdf[col] = gdf[col].astype(str).replace({"NaT": None, "nan": None})
 
     try:
         geojson = json.loads(gdf.to_json(drop_id=True))

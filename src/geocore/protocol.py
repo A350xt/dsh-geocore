@@ -10,6 +10,7 @@ This module is the single source of truth for error codes.
 
 from __future__ import annotations
 
+import datetime as _dt
 from typing import Any
 
 # Error codes (stable contract, see docs/tool-api.md)
@@ -31,6 +32,54 @@ class GeoCoreError(Exception):
         self.code = code
         self.message = message
         self.details = details or {}
+
+
+def json_safe(value: Any) -> Any:
+    """递归转成可 json.dumps 的值：datetime→ISO 字符串、numpy 标量→Python 标量。
+
+    时间字段是一等数据，任何响应出口（inspect samples / preview 表 / summaries）
+    都必须先经它清洗，杜绝 `Timestamp is not JSON serializable`。
+    """
+    if value is None or isinstance(value, (bool, str, int)):
+        return value
+    if isinstance(value, float):
+        return None if value != value else value  # NaN/Inf → None
+    if isinstance(value, (_dt.datetime, _dt.date, _dt.time)):
+        return value.isoformat()
+    if isinstance(value, _dt.timedelta):
+        return value.total_seconds()
+    try:                        # numpy.datetime64：先于 .item() 分支，否则变纳秒整数
+        import numpy as _np
+
+        if isinstance(value, _np.datetime64):
+            import pandas as _pd
+
+            return _pd.Timestamp(value).isoformat()
+    except ImportError:
+        pass
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, dict):
+        return {str(k): json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [json_safe(v) for v in (sorted(value) if isinstance(value, (set, frozenset)) and
+                                       all(isinstance(x, (str, int, float)) for x in value) else value)]
+    if hasattr(value, "isoformat"):  # pandas.Timestamp
+        try:
+            return value.isoformat()
+        except Exception:
+            pass
+    if hasattr(value, "item"):       # numpy 标量
+        try:
+            return json_safe(value.item())
+        except Exception:
+            pass
+    return str(value)
+
+
+def json_default(value: Any) -> Any:
+    """json.dumps(default=...) 出口：漏网的类型按安全规则兜底，而不是抛异常。"""
+    return json_safe(value)
 
 
 def ok_envelope(result: dict[str, Any]) -> dict[str, Any]:

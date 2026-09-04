@@ -17,7 +17,7 @@ pip install -e ".[viz,dev]"
 # 1) 生成合成城市「临江市」（6 区/22 道路/40 地块/医院学校 POI/河流洪水区）
 python scripts/make_synthetic_data.py
 
-# 2) 跑测试：55 个用例 + 14 道起始基准题（含 CRS 度量陷阱回归）
+# 2) 跑测试：78 个用例 + 14 道起始基准题（含 CRS 度量陷阱 / 中文 UTF-8 / datetime 回归）
 python -m pytest -q
 
 # 3) 端到端演示：物流园区选址（缓冲→求交→扣除洪水→度量→分区→出图）
@@ -64,7 +64,16 @@ DSH-GIS/
 
 - [x] **Phase 1 — Vector Core**：数据准备自动管线、Query&Measure / Proximity /
       Overlay / Zonal 四类原语、Artifact 中间步骤持久化与跨调用引用、专题图、
-      JSON 桥协议、Harness 插件、55 测试 + 14 基准题
+      JSON 桥协议、Harness 插件、78 测试 + 14 基准题
+- [x] **Phase 1.5 — 实测反馈加固**（首轮真实使用反馈驱动）：
+      全链路 UTF-8（中文路径/参数/标题在 GBK 宿主不再乱码）、datetime 一等支持
+      （CSV 时间列自动解析、ISO 序列化、时间过滤）、`trajectory.build` 轨迹算子、
+      `query.measure` 分组明细（`steps[].table`）与响应 `preview` 取数通道、
+      CRS 策略 v2（纯属性管线保持源 CRS + 请求级 `crs` 覆盖）、制图增强
+      （`base` 底图叠加 / `category_colors` 显式控色 / `size_field` 点径）、
+      桥错误附带中文修复提示
+- [ ] **Phase 1.6 — 时间序列表达**（待做）：时间聚合算子（周/月/时钟）、
+      折线图/极坐标图等非地图图表作为一等输出
 - [ ] **Phase 2 — Field GIS**：Raster/DEM/Map Algebra 与矢量交互
 - [ ] **Phase 3 — Network & Spatial Statistics**：七类补全
 - [ ] **Phase 4 — Scale**：PostGIS/DuckDB-Spatial 后端、并行与缓存、150–200 题全量 benchmark

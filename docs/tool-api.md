@@ -1,4 +1,4 @@
-# 工具 API 契约（v0.1，Phase 1 Vector Core）
+# 工具 API 契约（v0.2，Phase 1 Vector Core）
 
 三个工具构成模型的全部 GIS 表达面。所有响应都是单条 JSON 封套：
 
@@ -36,7 +36,7 @@ capabilities[]/notes[]`。
 
 ## gis_analyze
 
-请求：`{ title?, operations: Op[], output?: { format: "gpkg"|"geojson" } }`
+请求：`{ title?, crs?, operations: Op[], output?: { format: "gpkg"|"geojson" } }`
 
 `Op = { id, op, <按词表传参>, allow_empty? }`。步骤按序执行；
 后续步骤引用前序结果的三种写法：
@@ -52,7 +52,8 @@ capabilities[]/notes[]`。
 ```text
 query.filter            { input, where }
 query.select            { input, predicate?, ref }        # intersects|within|contains|touches|crosses|overlaps
-query.measure           { input, measures? }              # area_sqkm area_ha length_km count → 追加同名列并给汇总行
+query.measure           { input, measures?, group_by? }   # area_sqkm area_ha length_km count → 追加同名列并给汇总行；
+                                                          # group_by 给出后每组数值在 steps[].table 直接返回
 
 proximity.buffer        { input, distance_m, dissolve?, quad_segs?=16 }
 proximity.within_distance { input, ref, distance_m }      # 距参照层 distance_m 以内筛选
@@ -64,6 +65,8 @@ overlay.union           { a, b }
 overlay.clip            { a, b }                          # 只保留 a 的属性
 
 zonal.summarize         { regions, data, stats?, field? } # regions 必须为面
+trajectory.build        { input, time_field, group_by? }  # 点按时间排序连成轨迹线（如风暴路径/GPS），
+                                                          # 输出 point_count/start_time/end_time/duration_h
 ```
 
 zonal 说明：
@@ -75,23 +78,40 @@ zonal 说明：
 
 where 表达式：pandas query 语法；**Python 关键字列名必须用反引号**，
 如 `` `class` == '高速' ``（引擎自动改写为安全别名）。危险关键字直接拒绝。
+时间列已自动解析为 datetime，可直接比较：`time >= "2024-06-01"`。
 
 响应 result：`artifact_id/title/result{path,format,count,geometry_types}/
-summary[](中文摘要)/steps[]{id,op,count,summary}/warnings[]/crs{analysis,sources}/
+summary[](中文摘要)/steps[]{id,op,count,summary,table?}/warnings[]/crs{analysis,sources}/
 inputs[]/intermediate_layers{stepId:{layer,count}}`。
 
-CRS 承诺：任一步涉及度量则整次分析统一到一个米制投影坐标系（首个输入决定：
-已投影→采用；地理→按范围选 UTM），所有重投影都记入 warnings。
+取数通道（不必再读 artifact 文件）：
+- `preview`：最终结果前 10 行（非几何列，最多 12 列）；
+- `steps[].table`：分组明细（measure 的 group_by、trajectory 的逐轨迹）。
+
+CRS 承诺（v0.2 起）：
+- 度量类操作（proximity/overlay/zonal/measure）→ 整次分析统一到一个米制投影坐标系
+  （首个输入决定：已投影→采用；地理→按范围选 UTM），所有重投影都记入 warnings；
+- 纯属性/拓扑/轨迹管线 → **保持源 CRS**，不悄悄重投影；
+- 顶层 `crs` 参数可显式覆盖：`"source"`（跟随首个输入）或 `"EPSG:32622"` 等固定坐标系。
+
+编码承诺：全链路 UTF-8（子进程 `-X utf8` + stdin/stdout 重配）。中文路径、
+中文文件名、中文属性值、中文标题在任何 locale 的宿主（含中文 Windows 的 GBK
+默认代码页）下均原样往返。
 
 ## gis_visualize
 
-请求：`{ source, title?, style? }`
+请求：`{ source, base?, base_style?, title?, style? }`
 source 同上三种引用写法；写入既有 artifact 目录或新建 map 类型 artifact。
+`base` 为底图层（如陆地/行政区），垫在主图层之下；`base_style` 可调
+`{ color, edgecolor, alpha }`。
 
 style 键：`mode`(single|point|categorical|choropleth)、`field`、
 `classification`(quantile|equal_interval)、`classes`(2-9)、`cmap`、`color`、
-`size`、`figsize`、`dpi`。
-响应：`image_path + legend[] + warnings[]`。中文字体默认 Microsoft YaHei。
+`size`、`size_field` + `size_range:[min,max]`（point 模式按数值字段缩放点径）、
+`category_colors`（categorical 模式 `{"类别值": "#rrggbb"}` 显式控色）、
+`figsize`、`dpi`。
+响应：`image_path + legend[] + warnings[]`。中文字体默认 Microsoft YaHei
+（回退 SimHei / Noto Sans CJK）；中文标题与中文文件名均支持。
 
 ## 底层协议（供桥实现者）
 

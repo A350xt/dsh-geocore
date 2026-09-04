@@ -91,7 +91,8 @@ class ArtifactStore:
         return real
 
     def image_path_for(self, artifact_id: str, stem: str) -> Any:
-        stem_clean = re.sub(r"[^A-Za-z0-9_-]", "", stem)[:40] or "map"
+        # 保留中日韩字符（UTF-8 模式下文件系统可安全承载），仅剔除路径危险字符
+        stem_clean = re.sub(r"[^\w\u4e00-\u9fff\-]", "", stem, flags=re.UNICODE)[:40] or "map"
         candidate = os.path.join(self._dir_of(artifact_id), stem_clean + ".png")
         real = os.path.realpath(candidate)
         if not _contained(self.root_real, real):

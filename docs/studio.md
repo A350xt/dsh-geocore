@@ -74,6 +74,13 @@ profile 位于 `~/.dsh/profiles/geocore-studio/`（dsh-base bundle + cordis.patc
 `apps/geocore-studio/dist/studio-plugin.mjs`，含 port/pythonCmd/geocoreWorkdir/datasetsDir 配置）。
 修改启动配置就编辑那个 patch 文件。
 
+> 升级注意：宿主 dsh（npx）升级后，独立 profile 里冻结的旧版 `@deepseek-ai/*`
+> 可能与新版引导器不兼容（报 `dsh-settings does not provide an export named …`）。
+> 处理：删除该 profile 的 `node_modules` 后重新 boot 让其重装（若与正在运行的
+> DSH 并发，pnpm 可能卡锁——先停掉其他实例）；或直接用方式一随主 DSH 启动。
+> 新版 dsh 的 Web UI 带 token 门（启动时会打印 `…?token=…` 链接），客户端插件
+> 以合并路由 `/plugins/??pkg1/client.js,pkg2/client.js` 下发，单个插件 URL 404 属正常。
+
 ## 使用
 
 **地图工作台**

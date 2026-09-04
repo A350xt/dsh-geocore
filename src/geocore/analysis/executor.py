@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import re
 
-from geocore.analysis import overlay, proximity, query, zonal
+from geocore.analysis import overlay, proximity, query, trajectory, zonal
+from geocore.analysis.common import preview_table
 from geocore.analysis.resolver import DatasetResolver
 from geocore.protocol import E_BAD_REQUEST, E_EMPTY_RESULT, E_OP_UNKNOWN, GeoCoreError
 from geocore.runtime.artifact import ArtifactStore
@@ -12,8 +13,12 @@ from geocore.runtime.artifact import ArtifactStore
 _STEP_ID_RE = re.compile(r"\A[A-Za-z0-9_]{1,32}\Z")
 
 OP_HANDLERS: dict[str, object] = {}
-for _mod in (query, proximity, overlay, zonal):
+for _mod in (query, proximity, overlay, zonal, trajectory):
     OP_HANDLERS.update(_mod.SPEC)
+
+# 不需要度量坐标系的操作：纯属性过滤 / 拓扑选择 / 轨迹排序。
+# 全部步骤都属于此类时，默认保持源 CRS（不悄悄重投影到 UTM）。
+NON_METRIC_OPS = {"query.filter", "query.select", "trajectory.build"}
 
 
 def execute_analyze(workdir, request: dict) -> dict:
@@ -24,9 +29,18 @@ def execute_analyze(workdir, request: dict) -> dict:
     title = str(request.get("title") or "空间分析")
     output_format = str((request.get("output") or {}).get("format", "gpkg")).lower()
 
+    # 请求级 CRS 覆盖：显式指定 > 自动策略（纯非度量管线保持源 CRS）
+    crs_override = request.get("crs")
+    if crs_override is not None and not isinstance(crs_override, str):
+        raise GeoCoreError(E_BAD_REQUEST, "crs 必须是字符串（如 'EPSG:32622' 或 'source'）")
+    if crs_override is None:
+        op_names = {str(op.get("op") or "") for op in operations if isinstance(op, dict)}
+        if op_names and op_names <= NON_METRIC_OPS:
+            crs_override = "source"
+
     store = ArtifactStore(workdir)
     artifact_id, _dir = store.create("analysis", title)
-    resolver = DatasetResolver(store)
+    resolver = DatasetResolver(store, crs_override=crs_override)
 
     steps: list[dict] = []
     summaries: list[str] = []
@@ -75,12 +89,15 @@ def execute_analyze(workdir, request: dict) -> dict:
         resolver.register_step(raw_id, gdf)
         intermediates[raw_id] = gdf
         first_summary = result.summaries[0] if result.summaries else ""
-        steps.append({
+        step_entry = {
             "id": raw_id,
             "op": op,
             "count": int(len(gdf)),
             "summary": first_summary,
-        })
+        }
+        if result.table:
+            step_entry["table"] = result.table
+        steps.append(step_entry)
         summaries.extend(result.summaries)
         final_gdf = gdf
 
@@ -97,12 +114,14 @@ def execute_analyze(workdir, request: dict) -> dict:
         result_format=output_format,
         intermediates=intermediates,
     )
+    preview = preview_table(final_gdf) if final_gdf is not None else None
     return {
         "artifact_id": artifact_id,
         "title": title,
         "result": meta["result"],
         "summary": summaries,
         "steps": steps,
+        "preview": preview,
         "warnings": meta["warnings"],
         "crs": meta["crs"],
         "inputs": resolver.inputs_meta,

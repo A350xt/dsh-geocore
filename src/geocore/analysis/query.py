@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from geocore.analysis.common import StepResult, need, opt
+from geocore.protocol import E_BAD_REQUEST, E_INPUT_MISSING, GeoCoreError, json_safe
 from geocore.providers.geostack import PROVIDER
+
+GROUP_TABLE_LIMIT = 50
 
 
 def handle_filter(resolver, params: dict, step_id: str) -> StepResult:
@@ -29,6 +32,7 @@ def handle_select(resolver, params: dict, step_id: str) -> StepResult:
 
 def handle_measure(resolver, params: dict, step_id: str) -> StepResult:
     measures = list(opt(params, "measures", ["count"]))
+    group_by = opt(params, "group_by", None)
     gdf, _ = resolver.frame(need(params, "input", "query.measure"))
     out, totals = PROVIDER.measure(gdf, measures)
     parts = []
@@ -40,7 +44,38 @@ def handle_measure(resolver, params: dict, step_id: str) -> StepResult:
         parts.append(f"总长度 {totals['length_km_sum']:.3f} km")
     if "count" in totals:
         parts.append(f"共 {int(totals['count'])} 条要素")
-    return StepResult(out, ["度量结果：" + "；".join(parts)])
+    summaries = ["度量结果：" + "；".join(parts)]
+
+    table = None
+    if group_by:
+        group_by = str(group_by)
+        if group_by not in out.columns:
+            raise GeoCoreError(
+                E_INPUT_MISSING,
+                f"分组字段不存在：{group_by}",
+                {"columns": [str(c) for c in out.columns]},
+            )
+        # provider 刚写入的度量列（length_km / area_sqkm / …_calc）
+        value_cols = [c for c in out.columns
+                      if c not in gdf.columns and str(c) != out.geometry.name]
+        grouped = out.groupby(group_by, dropna=False)
+        columns = [group_by, "count", *[str(c) for c in value_cols]]
+        rows = []
+        for key, part in grouped:
+            row = [json_safe(key), int(len(part))]
+            row.extend(float(part[c].sum()) for c in value_cols)
+            rows.append(row)
+        truncated = len(rows) > GROUP_TABLE_LIMIT
+        if truncated:
+            rows = rows[:GROUP_TABLE_LIMIT]
+        table = {"columns": columns, "rows": rows}
+        summaries.append(
+            f"按 {group_by} 分组明细：{len(grouped)} 组"
+            + (f"（表中仅前 {GROUP_TABLE_LIMIT} 组）" if truncated else "")
+            + "——每组数值见 steps[].table"
+        )
+
+    return StepResult(out, summaries, table=table)
 
 
 SPEC = {

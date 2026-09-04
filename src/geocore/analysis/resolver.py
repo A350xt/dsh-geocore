@@ -4,7 +4,14 @@ One analysis request = ONE analysis CRS, decided deterministically from the
 first dataset that enters the pipeline (projected CRS wins; geographic inputs
 are moved to a suitable UTM zone). Every subsequently loaded frame is repaired,
 then reprojected into that CRS with a warning — so all downstream ops see a
-consistent, metric frame and cross-layer mismatches become impossible.
+consistent frame and cross-layer mismatches become impossible.
+
+CRS 策略（v2）：
+- 度量类操作（proximity/overlay/zonal/measure）必须投影坐标系 —— 默认仍走 UTM；
+- 纯属性/拓扑类管线（filter/select/trajectory）默认 **保持源 CRS**，不再悄悄
+  重投影（米制刻度的坐标轴不再是副作用）；
+- 请求级 `crs` 参数可显式指定分析坐标系（"source" = 跟随首个输入，或
+  "EPSG:xxxx" 等任意 CRS 串），优先级最高。
 """
 
 from __future__ import annotations
@@ -14,7 +21,7 @@ from pathlib import Path
 
 import geopandas as gpd
 
-from geocore.protocol import E_INPUT_MISSING, GeoCoreError
+from geocore.protocol import E_BAD_REQUEST, E_INPUT_MISSING, GeoCoreError
 from geocore.runtime.artifact import is_artifact_token
 from geocore.runtime.datasource import load_dataset
 from geocore.runtime.prepare import assume_missing_crs, estimate_utm, repair_geometries
@@ -29,7 +36,7 @@ def parse_step_ref(token: str):
 
 
 class DatasetResolver:
-    def __init__(self, store):
+    def __init__(self, store, crs_override: str | None = None):
         self.store = store
         self.warnings: list[str] = []
         self.inputs_meta: list[dict] = []
@@ -37,6 +44,7 @@ class DatasetResolver:
         self._provenance: dict[str, dict] = {}
         self._crs_sources: dict[str, str] = {}
         self._analysis_crs = None
+        self._crs_override = crs_override
 
     # ------------------------------------------------------------- resolution
 
@@ -73,6 +81,27 @@ class DatasetResolver:
         if self._analysis_crs is not None:
             return
         src = gdf.crs
+
+        if self._crs_override:
+            if self._crs_override.lower() in ("source", "keep", "keep_source"):
+                # 保持首个输入的坐标系；缺失 CRS 时仍回退 UTM（无法度量）
+                if src is not None:
+                    self._analysis_crs = src
+                else:
+                    self._analysis_crs = estimate_utm(gdf)
+                return
+            from pyproj import CRS
+
+            try:
+                self._analysis_crs = CRS.from_user_input(self._crs_override)
+            except Exception as exc:
+                raise GeoCoreError(
+                    E_BAD_REQUEST,
+                    f"crs 参数无法解析：{self._crs_override!r}（示例：'EPSG:32622' 或 'source'）",
+                    {"crs": self._crs_override},
+                ) from exc
+            return
+
         if src is not None and src.is_projected:
             try:
                 unit = (src.axis_info[0].unit_name or "").lower()
@@ -111,7 +140,7 @@ class DatasetResolver:
             gdf = gdf.to_crs(target)
 
         if was_none and self._analysis_crs is not None:
-            self.warnings.insert(0, f"本次分析的统一度量坐标系：{self._analysis_crs.to_string()}")
+            self.warnings.insert(0, f"本次分析的统一坐标系：{self._analysis_crs.to_string()}")
 
         prov_out = {
             "ref": key,

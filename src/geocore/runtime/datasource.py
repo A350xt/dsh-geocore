@@ -27,8 +27,30 @@ def _looks_like_lat(values: pd.Series) -> bool:
     return len(v) > 0 and v.between(-90, 90).all()
 
 
+def _coerce_datetime_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """把 ISO 日期/时间文本列自动解析为 datetime64，让时间成为一等数据。
+
+    只在「非空值 ≥80% 成功解析为时间且原本不是数值」时转换，避免误伤编码列。
+    返回 (df, 转换的列名列表)。
+    """
+    converted: list[str] = []
+    for col in df.columns:
+        s = df[col]
+        if pd.api.types.is_datetime64_any_dtype(s) or pd.api.types.is_numeric_dtype(s):
+            continue
+        nonnull = s.dropna()
+        if len(nonnull) == 0:
+            continue
+        parsed = pd.to_datetime(nonnull, errors="coerce", format="ISO8601")
+        if parsed.notna().mean() >= 0.8:
+            df[col] = pd.to_datetime(s, errors="coerce", format="ISO8601")
+            converted.append(str(col))
+    return df, converted
+
+
 def _load_csv_points(path: Path, layer: str | None) -> gpd.GeoDataFrame:
     df = pd.read_csv(path)
+    df, _dt_cols = _coerce_datetime_columns(df)
     lon_col = next((c for c in df.columns if c.strip().lower() in LON_CANDIDATES), None)
     lat_col = next((c for c in df.columns if c.strip().lower() in LAT_CANDIDATES), None)
     if lon_col is None or lat_col is None:
