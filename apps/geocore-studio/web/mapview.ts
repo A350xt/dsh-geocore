@@ -272,12 +272,14 @@ class MapView {
     tree.append(h('div', { class: 'tree-group-title' }, '数据集'))
     for (const d of this.inventory.datasets) {
       const loaded = this.layers.has(d.path)
+      const agentUsed = d.origin === 'agent-used'
       tree.append(h('div', { class: `tree-item ${loaded ? 'loaded' : ''}` },
         h('span', {
           class: 'item-name', title: d.path,
           onclick: () => (loaded ? this.removeLayer(d.path) : this.addLayer(d.path, d.name)),
-        }, `${this.formatIcon(d.format)} ${d.name}`),
-        h('span', { class: 'item-meta' }, fmtBytes(d.size_bytes)),
+        }, `${this.formatIcon(d.format)} ${d.name}${agentUsed ? ' ✦' : ''}`),
+        h('span', { class: 'item-meta' },
+          agentUsed ? 'agent 用过' : fmtBytes(d.size_bytes)),
       ))
     }
 

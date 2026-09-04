@@ -146,8 +146,6 @@ def list_operations() -> dict:
 
 # --------------------------------------------------------------- Studio 支持
 
-_DATASET_EXTS = (".geojson", ".json", ".gpkg", ".shp", ".csv")
-
 
 def read_layer(workdir: Path, payload: dict) -> dict:
     """把数据集 / artifact 最终结果 / artifact 中间步骤导出为 WGS84 GeoJSON。
@@ -243,36 +241,76 @@ def read_layer(workdir: Path, payload: dict) -> dict:
 
 
 def list_inventory(workdir: Path, payload: dict) -> dict:
-    """数据集目录 + artifacts 清单（Studio 图层面板数据源）。"""
-    datasets_dir = payload.get("datasets_dir")
-    out: dict = {"datasets": [], "artifacts": []}
+    """数据集 + artifacts 清单（Studio 图层面板数据源）。
 
-    if datasets_dir:
-        root = Path(str(datasets_dir))
-        if not root.is_absolute() or not root.is_dir():
-            raise GeoCoreError(E_BAD_REQUEST, f"datasets_dir 无效：{datasets_dir}")
-        for entry in sorted(root.iterdir()):
-            if not entry.is_file() or entry.suffix.lower() not in _DATASET_EXTS:
-                continue
-            fmt = {"geojson": (".geojson", ".json"), "gpkg": (".gpkg",),
-                   "shapefile": (".shp",), "csv": (".csv",)}
-            kind = next(k for k, exts in fmt.items() if entry.suffix.lower() in exts)
-            out["datasets"].append({
-                "name": entry.stem,
-                "path": str(entry),
-                "format": kind,
-                "size_bytes": entry.stat().st_size,
-            })
+    数据集来源优先级（对齐「Studio 只见当前 agent 项目」的原则）：
+    1. agent-used：artifact 元数据里记录的 inputs（agent 实际用过的文件）；
+    2. workspace：请求给定的 datasets_dirs（DSH 工作区根）做有上限的浅扫描；
+    3. 兼容旧 datasets_dir 单目录参数。
+    坏 meta 跳过并计数，绝不让整个清单失败。
+    """
+    roots: list[str] = []
+    for key in ("datasets_dirs", "datasets_dir"):
+        v = payload.get(key)
+        if isinstance(v, str) and v:
+            roots.append(v)
+        elif isinstance(v, list):
+            roots.extend(str(x) for x in v if str(x))
+    out: dict = {"datasets": [], "artifacts": [], "skipped_corrupt": 0}
+    seen_paths: set[str] = set()
+
+    def _push_dataset(path_str: str, origin: str) -> None:
+        p = Path(path_str)
+        key = str(p).replace("\\", "/").lower()
+        if key in seen_paths or not p.is_file():
+            return
+        ext = p.suffix.lower()
+        if ext == ".json" and not _looks_like_geojson(p):
+            return  # package.json/tsconfig.json 等非空间 JSON 不进清单
+        fmt = next((k for k, exts in
+                    {"geojson": (".geojson", ".json"), "gpkg": (".gpkg",),
+                     "shapefile": (".shp",), "csv": (".csv",)}.items()
+                    if ext in exts), None)
+        if fmt is None:
+            return
+        seen_paths.add(key)
+        out["datasets"].append({
+            "name": p.stem,
+            "path": str(p),
+            "format": fmt,
+            "size_bytes": p.stat().st_size,
+            "origin": origin,
+        })
 
     store = ArtifactStore(Path(workdir))
+    workdir_real = str(store.root_real)
+    metas: list[dict] = []
     for artifact_id in store.list_ids():
         try:
             meta = store.get(artifact_id)
         except GeoCoreError:
+            out["skipped_corrupt"] += 1
             continue
+        metas.append(meta)
+        # agent 用过的输入文件 → 数据集清单（agent 自主决定显示什么的第一来源）
+        for inp in meta.get("inputs") or []:
+            p = inp.get("path")
+            if p and not str(p).replace("\\", "/").lower().startswith(
+                    workdir_real.replace("\\", "/").lower()):
+                _push_dataset(str(p), "agent-used")
+
+    for root_str in roots:
+        root = Path(root_str)
+        if not root.is_absolute() or not root.is_dir():
+            continue
+        _scan_workspace(root, _push_dataset, limit=300)
+
+    out["datasets"].sort(key=lambda d: ({"agent-used": 0, "workspace": 1}.get(d["origin"], 2), d["name"]))
+
+    for meta in metas:
         res = meta.get("result") or {}
         out["artifacts"].append({
-            "artifact_id": artifact_id,
+            "artifact_id": meta["artifact_id"],
             "kind": meta.get("kind"),
             "title": meta.get("title", ""),
             "created": meta.get("created", ""),
@@ -285,3 +323,41 @@ def list_inventory(workdir: Path, payload: dict) -> dict:
         })
     out["artifacts"].reverse()  # 新的在前
     return out
+
+
+_SKIP_DIRS = {"node_modules", ".git", "__pycache__", ".venv", "venv", "dist",
+              "web-dist", "lib", "build", ".mimosa", ".zcode", ".pytest_cache",
+              "tmp-visual", ".tmp-cli", "edge-profile"}
+
+
+def _looks_like_geojson(path: Path) -> bool:
+    """只读前 4KB 嗅探：含 FeatureCollection/Feature/features/geometries 才算空间 JSON。"""
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as fh:
+            head = fh.read(4096).lower()
+        return any(token in head for token in
+                   ('"featurecollection"', '"features"', '"geometries"', '"type": "feature"'))
+    except OSError:
+        return False
+
+
+def _scan_workspace(root: Path, push, *, limit: int, max_depth: int = 3) -> None:
+    """有上限的浅扫描：深度 ≤3、跳过依赖/缓存目录、最多 limit 个文件。"""
+    found = 0
+    stack: list[tuple[Path, int]] = [(root, 0)]
+    while stack and found < limit:
+        cur, depth = stack.pop()
+        try:
+            entries = sorted(cur.iterdir())
+        except OSError:
+            continue
+        for entry in entries:
+            if found >= limit:
+                break
+            if entry.is_file():
+                if entry.suffix.lower() in (".geojson", ".json", ".gpkg", ".shp", ".csv"):
+                    push(str(entry), "workspace")
+                    found += 1
+            elif depth + 1 <= max_depth and entry.name not in _SKIP_DIRS \
+                    and not entry.name.startswith("edge-profile"):
+                stack.append((entry, depth + 1))

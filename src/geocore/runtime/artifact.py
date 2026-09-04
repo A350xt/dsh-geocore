@@ -109,16 +109,26 @@ class ArtifactStore:
         import io
 
         data = json.dumps(payload, ensure_ascii=False, indent=2)
-        with io.open(target_real, "w", encoding="utf-8") as fh:
+        # 原子写：先写临时文件再替换，进程被杀不会留下 0 字节 meta
+        tmp_real = target_real + ".tmp"
+        with io.open(tmp_real, "w", encoding="utf-8") as fh:
             fh.write(data)
+        os.replace(tmp_real, target_real)
 
     def _read_json(self, target_real: str) -> dict:
         if not _contained(self.root_real, os.path.realpath(target_real)):
             raise GeoCoreError(E_OUTPUT_ERROR, "json 读取越界")
         import io
 
-        with io.open(target_real, "r", encoding="utf-8") as fh:
-            return json.load(fh)
+        try:
+            with io.open(target_real, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+            raise GeoCoreError(
+                E_OUTPUT_ERROR,
+                f"artifact 元数据损坏（{os.path.basename(os.path.dirname(target_real))}）：{exc}",
+                {"file": os.path.basename(target_real)},
+            ) from exc
 
     # ------------------------------------------------------------------- api
 

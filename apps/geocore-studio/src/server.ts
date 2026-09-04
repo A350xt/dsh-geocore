@@ -96,8 +96,28 @@ export function startStudioServer(
     config.webDist ?? path.join(HERE, '..', 'web-dist'),
   )
 
-  async function serveStatic(urlPath: string, res: ServerResponse): Promise<void> {
-    const clean = urlPath.split('?')[0].replace(/^\/+/, '')
+  /** 数据集扫描根：当前 DSH agent 工作区优先；插件配置目录仅兜底。
+
+   workspaceRegistry 是宿主（DSH web）的服务；未注入或不存在时 cordis 对
+   属性访问抛错——防御式读取，任何失败都静默降级到配置目录/仅产物驱动。
+   */
+  function datasetRoots(): string[] {
+    const roots: string[] = []
+    try {
+      const registry = (ctx as { workspaceRegistry?: unknown }).workspaceRegistry
+      if (registry && typeof (registry as { list?: unknown }).list === 'function') {
+        const workspaces = (registry as { list: () => Array<{ path?: unknown }> }).list()
+        for (const ws of workspaces ?? []) {
+          const p = typeof ws?.path === 'string' ? ws.path : ''
+          if (p) roots.push(path.resolve(p))
+        }
+      }
+    } catch { /* 宿主没有 workspace 服务（standalone profile）——走兜底 */ }
+    if (roots.length === 0 && datasetsReal) roots.push(datasetsReal)
+    return roots
+  }
+
+  async function serveStatic(urlPath: string, res: ServerResponse): Promise<void> {    const clean = urlPath.split('?')[0].replace(/^\/+/, '')
     let target = clean === '' ? 'index.html' : clean
     const resolved = path.resolve(webDistReal, target)
     if (!contained(webDistReal, resolved)) {
@@ -172,9 +192,7 @@ export function startStudioServer(
       }
 
       if (url.pathname === '/api/inventory' && req.method === 'GET') {
-        const result = await bridge.call('list', {
-          datasets_dir: datasetsReal ?? '',
-        })
+        const result = await bridge.call('list', { datasets_dirs: datasetRoots() })
         json(res, 200, { ok: true, result })
         return
       }

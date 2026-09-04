@@ -44,6 +44,7 @@ export interface DatasetEntry {
   path: string
   format: string
   size_bytes: number
+  origin?: 'agent-used' | 'workspace'
 }
 
 export interface ArtifactEntry {
