@@ -25,7 +25,7 @@ from geocore.protocol import E_BAD_REQUEST, E_INPUT_MISSING, E_OUTPUT_ERROR, Geo
 
 _ARTIFACT_ID_RE = re.compile(r"\Aar_[A-Za-z0-9]{10,32}\Z")
 _ALPHABET = string.ascii_lowercase + string.digits
-_RESULT_NAMES = {"gpkg": "result.gpkg", "geojson": "result.geojson"}
+_RESULT_NAMES = {"gpkg": "result.gpkg", "geojson": "result.geojson", "tif": "result.tif"}
 _META_NAME = "meta.json"
 _PLAN_NAME = "plan.json"
 
@@ -56,6 +56,12 @@ def _contained(root_real: str, candidate_real: str) -> bool:
     return candidate_real == root_real or candidate_real.startswith(root_real + os.sep)
 
 
+def _raster_valid_cells(rf) -> int:
+    import numpy as np
+
+    return int(np.isfinite(rf.data).sum())
+
+
 class ArtifactStore:
     def __init__(self, workdir):
         base_real = os.path.realpath(str(workdir))
@@ -82,7 +88,7 @@ class ArtifactStore:
         return real
 
     def result_path_of(self, artifact_id: str, fmt: str) -> str:
-        key = "geojson" if fmt == "geojson" else "gpkg"
+        key = fmt if fmt in _RESULT_NAMES else ("geojson" if fmt == "geojson" else "gpkg")
         name = _RESULT_NAMES[key]
         candidate = os.path.join(self._dir_of(artifact_id), name)
         real = os.path.realpath(candidate)
@@ -161,23 +167,55 @@ class ArtifactStore:
         result_gdf,
         result_format: str,
         intermediates: dict | None = None,
+        result_raster=None,
     ) -> dict:
-        fmt = "geojson" if result_format == "geojson" else "gpkg"
-        result_path = self.result_path_of(artifact_id, fmt)
+        dir_real = self._dir_of(artifact_id)
         steps_index: dict = {}
         try:
-            if fmt == "geojson":
-                result_gdf.to_file(result_path, driver="GeoJSON", index=False)
+            from pathlib import Path
+
+            from geocore.raster_core import RasterFrame, save_raster
+
+            # 中间步骤统一持久化（无论最终结果是矢量还是栅格）：
+            # RasterFrame → step_<id>.tif；GeoDataFrame → GPKG 图层（最终为 geojson 时除外）
+            persist_vector_steps = None  # 延迟决定（取决于最终格式）
+            if result_raster is not None:
+                result_path = save_raster(result_raster, Path(dir_real) / "result.tif")
+                fmt = "tif"
+                count = _raster_valid_cells(result_raster)
+                geometry_types = ["Raster"]
+                extra_result = {
+                    "cellsize": result_raster.cellsize,
+                    "shape": list(result_raster.data.shape),
+                }
             else:
-                result_gdf.to_file(result_path, layer="result", driver="GPKG",
-                                   engine="pyogrio", index=False)
-                # 中间步骤同样入库：后续调用可用 ar_xxx#stepId 引用
-                steps_index: dict = {}
-                for sid, step_gdf in sorted((intermediates or {}).items()):
+                fmt = "geojson" if result_format == "geojson" else "gpkg"
+                result_path = self.result_path_of(artifact_id, fmt)
+                if fmt == "geojson":
+                    result_gdf.to_file(result_path, driver="GeoJSON", index=False)
+                else:
+                    result_gdf.to_file(result_path, layer="result", driver="GPKG",
+                                       engine="pyogrio", index=False)
+                    persist_vector_steps = True
+                count = int(len(result_gdf))
+                geometry_types = sorted({str(t) for t in result_gdf.geometry.geom_type})
+                extra_result = {}
+
+            for sid, step_val in sorted((intermediates or {}).items()):
+                # 约定与矢量产物一致：每个步骤都可被 ar_xxx#stepId 引用（含最后一步，
+                # 它同时是 result.*——冗余一份但语义统一）
+                if isinstance(step_val, RasterFrame):
+                    tif = save_raster(step_val, Path(dir_real) / f"step_{sid}.tif")
+                    steps_index[sid] = {"layer": tif.name,
+                                        "count": _raster_valid_cells(step_val),
+                                        "kind": "raster"}
+                elif persist_vector_steps and hasattr(step_val, "geometry"):
                     layer = f"step_{sid}"
-                    step_gdf.to_file(result_path, layer=layer, driver="GPKG",
+                    step_val.to_file(result_path, layer=layer, driver="GPKG",
                                      engine="pyogrio", index=False)
-                    steps_index[sid] = {"layer": layer, "count": int(len(step_gdf))}
+                    steps_index[sid] = {"layer": layer, "count": int(len(step_val))}
+        except GeoCoreError:
+            raise
         except Exception as exc:
             raise GeoCoreError(E_OUTPUT_ERROR, "结果数据集写出失败:" + str(exc)) from exc
 
@@ -195,10 +233,11 @@ class ArtifactStore:
             "title": title,
             "created": datetime.now().isoformat(timespec="seconds"),
             "result": {
-                "path": result_path,
+                "path": str(result_path),
                 "format": fmt,
-                "count": int(len(result_gdf)),
-                "geometry_types": sorted({str(t) for t in result_gdf.geometry.geom_type}),
+                "count": count,
+                "geometry_types": geometry_types,
+                **extra_result,
             },
             "summary": summaries,
             "warnings": warnings,

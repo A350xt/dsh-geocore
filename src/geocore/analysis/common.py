@@ -8,12 +8,14 @@ from typing import Any
 
 @dataclass
 class StepResult:
-    gdf: object                      # geopandas.GeoDataFrame
+    gdf: object                      # geopandas.GeoDataFrame（矢量结果）
     summaries: list[str] = field(default_factory=list)
     """结构化明细表（如 measure 的分组汇总）：{columns: [...], rows: [[...], ...]}。
 
     直接进响应（steps[].table），让 Agent 不必再开 artifact 取数。"""
     table: dict[str, Any] | None = None
+    """栅格结果（与 gdf 互斥）：float32 + NaN=nodata。"""
+    raster: Any = None
 
 
 def need(params: dict, key: str, op: str):

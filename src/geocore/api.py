@@ -23,6 +23,20 @@ from geocore.runtime.prepare import assume_missing_crs
 def inspect(payload: dict) -> dict:
     """Understand a dataset without analyzing it."""
     path = str(payload.get("path") or "")
+    if Path(path).suffix.lower() in (".tif", ".tiff"):
+        from geocore.raster_core import raster_meta_of
+
+        meta = raster_meta_of(path)
+        return {
+            **meta,
+            "source": {"format": "tif", "path": path},
+            "capabilities": ["raster.*"],
+            "supported_formats_note": "栅格已支持（raster 域算子）；多波段先指定 band",
+            "notes": [
+                f"NoData 占比 {meta['nodata_pct']}%",
+                "栅格化/重采样/统计请走 gis_analyze 的 raster.* 词表",
+            ],
+        }
     gdf, prov = load_dataset(path)
 
     types = {}
@@ -82,6 +96,7 @@ def analyze(workdir: Path, payload: dict) -> dict:
 
 def visualize(workdir: Path, payload: dict) -> dict:
     from geocore.analysis.resolver import DatasetResolver
+    from geocore.raster_core import is_raster_path
     from geocore.runtime.artifact import is_artifact_token
     from geocore.viz.map import render_map
 
@@ -103,14 +118,38 @@ def visualize(workdir: Path, payload: dict) -> dict:
 
     # 制图保持源 CRS（避免坐标轴出现米制刻度）；多层仍自动对齐到首个输入
     resolver = DatasetResolver(store, crs_override="source")
-    gdf, _ = resolver.frame(source)
     base_gdf = None
     if base:
         base_gdf, _ = resolver.frame(str(base))
 
     out_path = store.image_path_for(artifact_id, title)
-    legend = render_map(gdf, style=style, out_path=out_path, title=title,
-                        base_gdf=base_gdf, base_style=base_style)
+
+    def _is_raster_source(tok: str) -> bool:
+        from geocore.analysis.resolver import parse_step_ref
+
+        if is_raster_path(tok):
+            return True
+        if is_artifact_token(tok):
+            meta = store.get(tok)
+            return str((meta.get("result") or {}).get("format", "")).lower() in ("tif", "tiff")
+        step_ref = parse_step_ref(tok)
+        if step_ref:
+            meta = store.get(step_ref[0])
+            info = (meta.get("intermediate_layers") or {}).get(step_ref[1]) or {}
+            return str(info.get("kind", "")) == "raster" or \
+                str(info.get("layer", "")).lower().endswith(".tif")
+        return False
+
+    if _is_raster_source(source):
+        # 栅格制图：连续色带拉伸 / 分类色表
+        from geocore.viz.map import render_raster
+
+        rf, _ = resolver.raster(source)
+        legend = render_raster(rf, style=style, out_path=out_path, title=title)
+    else:
+        gdf, _ = resolver.frame(source)
+        legend = render_map(gdf, style=style, out_path=out_path, title=title,
+                            base_gdf=base_gdf, base_style=base_style)
 
     if not base_artifact:
         store.finalize_map(artifact_id, image=str(out_path), legend=legend,
@@ -167,7 +206,14 @@ def read_layer(workdir: Path, payload: dict) -> dict:
     if is_artifact_token(source):
         artifact_id = source
         store = ArtifactStore(Path(workdir))
-        store.get(artifact_id)  # 存在性校验
+        meta = store.get(artifact_id)  # 存在性校验
+        if str((meta.get("result") or {}).get("format", "")).lower() in ("tif", "tiff"):
+            raise GeoCoreError(
+                E_BAD_REQUEST,
+                "这是栅格产物，Studio 地图暂不支持栅格上图；请在 DSH 里用 gis_visualize 制图，"
+                "或先 raster.polygonize 转矢量",
+                {"artifact": artifact_id},
+            )
         path = store.resolve_result_path(artifact_id)
     elif (step_ref := parse_step_ref(source)):
         artifact_id, step_id = step_ref

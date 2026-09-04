@@ -36,6 +36,71 @@ def _classification(values, n_classes: int, method: str):
     return sorted({float(q) for q in qs})
 
 
+def render_raster(rf, *, style: dict, out_path: Path, title: str) -> list[str]:
+    """栅格专题图：连续（色带+拉伸）/ 分类（类别色表）。
+
+    style：mode=continuous|categorical；cmap；vmin/vmax 或 stretch=[p_lo,p_hi]
+    （百分位拉伸，默认 [2,98]）；categorical 用 category_colors {"值": "#rrggbb"}。
+    """
+    import matplotlib.colors as mcolors
+    import numpy as np
+
+    mode = str(style.get("mode") or "continuous").lower()
+    dpi = int(style.get("dpi", 150))
+    figsize = tuple(style.get("figsize", [10, 8]))
+    data = np.ma.masked_invalid(np.asarray(rf.data, dtype="float64"))
+
+    fig, ax = plt.subplots(figsize=figsize)
+    legend_entries: list[str] = []
+    try:
+        minx, miny, maxx, maxy = rf.bounds
+        if mode in ("categorical", "category"):
+            values = np.unique(np.asarray(rf.data)[np.isfinite(rf.data)])
+            overrides = style.get("category_colors") or {}
+            # 覆盖色优先（hex 字符串），否则 tab20 自动分配（RGBA 元组）
+            palette = [overrides.get(str(_fmt_val(v)), None) or tuple(float(x) for x in c)
+                       for v, c in zip(values, plt.get_cmap("tab20")(range(len(values))))]
+            cmap = mcolors.ListedColormap(palette)
+            norm = mcolors.BoundaryNorm(np.append(values - 0.5, values[-1] + 0.5), cmap.N)
+            im = ax.imshow(data, cmap=cmap, norm=norm, extent=(minx, maxx, miny, maxy),
+                           origin="upper", interpolation="nearest")
+            from matplotlib.patches import Patch
+
+            handles = [Patch(facecolor=palette[i], label=_fmt_val(values[i]))
+                       for i in range(len(values))]
+            ax.legend(handles=handles, loc="lower left", fontsize=9, title="类别")
+            legend_entries = [f"{_fmt_val(v)}" for v in values]
+        else:
+            cmap_name = str(style.get("cmap", "viridis"))
+            if "vmin" in style and "vmax" in style:
+                vmin, vmax = float(style["vmin"]), float(style["vmax"])
+            else:
+                lo, hi = style.get("stretch", [2, 98])
+                finite = np.asarray(rf.data)[np.isfinite(rf.data)]
+                vmin, vmax = (np.percentile(finite, [float(lo), float(hi)])
+                              if finite.size else (0.0, 1.0))
+            im = ax.imshow(data, cmap=cmap_name, vmin=vmin, vmax=vmax,
+                           extent=(minx, maxx, miny, maxy), origin="upper")
+            cbar = fig.colorbar(im, ax=ax, shrink=0.75)
+            unit = str(style.get("unit", ""))
+            cbar.set_label(unit or "值")
+            legend_entries = [f"色带 {cmap_name}，拉伸 [{vmin:.4g}, {vmax:.4g}]"]
+        ax.set_aspect("equal")
+        ax.set_title(title, fontsize=14)
+        ax.set_axis_off()
+        out_path = Path(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_path, dpi=dpi, bbox_inches="tight", facecolor="white")
+        return legend_entries
+    finally:
+        plt.close(fig)
+
+
+def _fmt_val(v) -> str:
+    f = float(v)
+    return str(int(f)) if f == int(f) else f"{f:.4g}"
+
+
 def render_map(gdf, *, style: dict, out_path: Path, title: str,
                base_gdf=None, base_style: dict | None = None) -> list[str]:
     """Render `gdf` (可叠加 `base_gdf` 底图层) into out_path; returns legend entries.

@@ -22,6 +22,7 @@ from pathlib import Path
 import geopandas as gpd
 
 from geocore.protocol import E_BAD_REQUEST, E_INPUT_MISSING, GeoCoreError
+from geocore.raster_core import RasterFrame, load_raster, reproject_rf
 from geocore.runtime.artifact import is_artifact_token
 from geocore.runtime.datasource import load_dataset
 from geocore.runtime.prepare import assume_missing_crs, estimate_utm, repair_geometries
@@ -48,32 +49,52 @@ class DatasetResolver:
 
     # ------------------------------------------------------------- resolution
 
-    def register_step(self, step_id: str, gdf: gpd.GeoDataFrame) -> None:
+    def register_step(self, step_id: str, gdf) -> None:
         self._frames[f"@{step_id}"] = gdf
-        self._provenance[f"@{step_id}"] = {"kind": "step", "step": step_id, "crs": str(gdf.crs)}
+        self._provenance[f"@{step_id}"] = {
+            "kind": "raster" if isinstance(gdf, RasterFrame) else "step",
+            "step": step_id,
+            "crs": str(getattr(gdf, "crs", None)),
+        }
 
-    def _resolve_source(self, token: str) -> tuple[gpd.GeoDataFrame | None, dict]:
-        """Load an unnormalized source; None token means @step hit earlier."""
+    def _resolve_source(self, token: str):
+        """Load an unnormalized source (vector or raster); None means @step hit earlier."""
         prov: dict = {}
         if is_artifact_token(token):
             path = self.store.resolve_result_path(str(token))
-            gdf, prov = load_dataset(str(path))
             prov["artifact"] = str(token)
+            if str(path).lower().endswith((".tif", ".tiff")):
+                return load_raster(str(path)), prov
+            gdf, prov = load_dataset(str(path))
             return gdf, prov
         step_ref = _STEP_REF_RE.fullmatch(str(token))
         if step_ref:
             art_id, step_id = step_ref.group(1), step_ref.group(2)
             # 校验 artifact 存在，再读取其中持久化的中间步骤图层
-            self.store.get(art_id)
-            path = self.store.resolve_result_path(art_id)
-            gdf, prov = load_dataset(str(path), layer=f"step_{step_id}")
-            prov["artifact"] = art_id
-            prov["step"] = step_id
+            meta = self.store.get(art_id)
+            steps_index = meta.get("intermediate_layers") or {}
+            if step_id not in steps_index:
+                raise GeoCoreError(
+                    E_INPUT_MISSING,
+                    f"artifact {art_id} 没有中间步骤 {step_id}",
+                    {"available_steps": sorted(steps_index)},
+                )
+            layer_name = str(steps_index[step_id].get("layer", ""))
+            result_path = self.store.resolve_result_path(art_id)
+            prov.update({"artifact": art_id, "step": step_id})
+            if layer_name.lower().endswith(".tif"):
+                tif = result_path.parent / layer_name
+                return load_raster(str(tif)), prov
+            gdf, prov2 = load_dataset(str(result_path), layer=layer_name)
+            prov.update(prov2)
             return gdf, prov
         path = Path(str(token))
         if not path.is_absolute():
             hint = {"token": str(token)}
             raise GeoCoreError(E_INPUT_MISSING, f"输入不存在：{path}", hint)
+        if path.suffix.lower() in (".tif", ".tiff"):
+            prov = {"format": "raster", "path": str(path)}
+            return load_raster(str(path)), prov
         gdf, prov = load_dataset(str(path))
         return gdf, prov
 
@@ -121,9 +142,21 @@ class DatasetResolver:
         key = str(token)
         cached = self._frames.get(key)
         if cached is not None:
+            if isinstance(cached, RasterFrame):
+                raise GeoCoreError(
+                    E_BAD_REQUEST,
+                    f"{key} 是栅格图层；矢量算子需要矢量输入（可用 raster.* 算子处理它）",
+                    {"token": key},
+                )
             return cached, self._provenance[key]
 
         gdf, prov = self._resolve_source(key)
+        if isinstance(gdf, RasterFrame):
+            raise GeoCoreError(
+                E_BAD_REQUEST,
+                f"{key} 是栅格数据；矢量算子需要矢量输入（先 raster.polygonize/sample 转矢量）",
+                {"token": key},
+            )
         name = prov.get("format", "input") + ":" + key
         gdf = assume_missing_crs(gdf, prov.get("format", key), self.warnings)
         gdf = repair_geometries(gdf, self.warnings)
@@ -157,6 +190,82 @@ class DatasetResolver:
         self._frames[key] = gdf
         self._provenance[key] = prov_out
         return gdf, prov_out
+
+    def raster(self, token: str) -> tuple[RasterFrame, dict]:
+        """栅格版 frame()：同样的 CRS 统一策略（首个输入决定，地理 CRS → UTM）。"""
+        key = str(token)
+        cached = self._frames.get(key)
+        if cached is not None:
+            if not isinstance(cached, RasterFrame):
+                raise GeoCoreError(
+                    E_BAD_REQUEST,
+                    f"{key} 是矢量图层；栅格算子需要栅格输入（先 raster.from_vector 栅格化）",
+                    {"token": key},
+                )
+            return cached, self._provenance[key]
+
+        raw, prov = self._resolve_source(key)
+        if not isinstance(raw, RasterFrame):
+            raise GeoCoreError(
+                E_BAD_REQUEST,
+                f"{key} 是矢量数据；栅格算子需要栅格输入（先 raster.from_vector 栅格化）",
+                {"token": key},
+            )
+        name = "raster:" + key
+        was_none = self._analysis_crs is None
+        origin = str(raw.crs)
+
+        if self._analysis_crs is None:
+            from geocore.runtime.prepare import estimate_utm
+
+            src = raw.crs
+            adopt = None
+            if src is not None and src.is_projected:
+                try:
+                    unit = (src.axis_info[0].unit_name or "").lower()
+                except Exception:
+                    unit = ""
+                if any(u in unit for u in ("metre", "meter", "foot")):
+                    adopt = src
+            if adopt is None:
+                # 用外接矩形中心点估 UTM（与矢量 estimate_utm 同思路）
+                import geopandas as _gpd
+                from shapely.geometry import box
+
+                minx, miny, maxx, maxy = raw.bounds
+                center = _gpd.GeoDataFrame(
+                    geometry=[box(minx, miny, maxx, maxy)], crs=raw.crs)
+                adopt = estimate_utm(center)
+            self._analysis_crs = adopt
+
+        target = self._analysis_crs
+        self._crs_sources[name] = origin
+        rf = raw
+        if rf.crs is None:
+            rf = RasterFrame(raw.data, raw.transform, target, name=raw.name)
+        elif str(rf.crs) != str(target):
+            self.warnings.append(
+                f"{name} 已从 {origin} 统一重投影到分析坐标系 {target.to_string()}"
+            )
+            rf = reproject_rf(raw, target)
+
+        if was_none and self._analysis_crs is not None:
+            self.warnings.insert(0, f"本次分析的统一坐标系：{self._analysis_crs.to_string()}")
+
+        prov_out = {
+            "ref": key,
+            "format": "raster",
+            "path": prov.get("path"),
+            "count": int(rf.data.size),
+        }
+        if prov.get("artifact"):
+            prov_out["artifact"] = prov["artifact"]
+        if prov.get("step"):
+            prov_out["step"] = prov["step"]
+        self.inputs_meta.append(prov_out)
+        self._frames[key] = rf
+        self._provenance[key] = prov_out
+        return rf, prov_out
 
     def crs_info(self) -> dict:
         target = self._analysis_crs.to_string() if self._analysis_crs is not None else ""

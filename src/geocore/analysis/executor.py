@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import re
 
-from geocore.analysis import overlay, proximity, query, trajectory, zonal
+import numpy as np
+
+from geocore.analysis import overlay, proximity, query, raster, trajectory, zonal
 from geocore.analysis.common import preview_table
 from geocore.analysis.resolver import DatasetResolver
 from geocore.protocol import E_BAD_REQUEST, E_EMPTY_RESULT, E_OP_UNKNOWN, GeoCoreError
+from geocore.raster_core import RasterFrame, _check_cells
 from geocore.runtime.artifact import ArtifactStore
 
 _STEP_ID_RE = re.compile(r"\A[A-Za-z0-9_]{1,32}\Z")
 
 OP_HANDLERS: dict[str, object] = {}
-for _mod in (query, proximity, overlay, zonal, trajectory):
+for _mod in (query, proximity, overlay, zonal, trajectory, raster):
     OP_HANDLERS.update(_mod.SPEC)
 
 # 不需要度量坐标系的操作：纯属性过滤 / 拓扑选择 / 轨迹排序。
@@ -77,7 +80,15 @@ def execute_analyze(workdir, request: dict) -> dict:
             raise GeoCoreError(E_BAD_REQUEST, str(exc.args[0]), {"step": raw_id, "op": op}) from exc
 
         gdf = result.gdf
-        if gdf is None or len(gdf) == 0:
+        raster_rf = result.raster
+        if raster_rf is not None:
+            _check_cells(raster_rf)
+            empty = raster_rf.is_empty()
+            count = int(np.isfinite(raster_rf.data).sum())
+        else:
+            empty = gdf is None or len(gdf) == 0
+            count = int(len(gdf)) if gdf is not None else 0
+        if empty:
             if not allow_empty:
                 raise GeoCoreError(
                     E_EMPTY_RESULT,
@@ -86,13 +97,14 @@ def execute_analyze(workdir, request: dict) -> dict:
                 )
             result.summaries.append(f"（步骤 {raw_id} 结果为空——已按 allow_empty 继续）")
 
-        resolver.register_step(raw_id, gdf)
-        intermediates[raw_id] = gdf
+        payload = raster_rf if raster_rf is not None else gdf
+        resolver.register_step(raw_id, payload)
+        intermediates[raw_id] = payload
         first_summary = result.summaries[0] if result.summaries else ""
         step_entry = {
             "id": raw_id,
             "op": op,
-            "count": int(len(gdf)),
+            "count": count,
             "summary": first_summary,
         }
         if result.table:
@@ -100,6 +112,7 @@ def execute_analyze(workdir, request: dict) -> dict:
         steps.append(step_entry)
         summaries.extend(result.summaries)
         final_gdf = gdf
+        final_raster = raster_rf
 
     meta = store.finalize_analysis(
         artifact_id,
@@ -110,11 +123,14 @@ def execute_analyze(workdir, request: dict) -> dict:
         warnings=list(dict.fromkeys(resolver.warnings)),
         crs_info=resolver.crs_info(),
         inputs=resolver.inputs_meta,
-        result_gdf=final_gdf,
+        result_gdf=(None if final_raster is not None else final_gdf),
+        result_raster=final_raster,
         result_format=output_format,
         intermediates=intermediates,
     )
-    preview = preview_table(final_gdf) if final_gdf is not None else None
+    # 栅格结果的"预览表"由 steps[].table（分位/元信息）承担
+    preview = preview_table(final_gdf) if (final_gdf is not None
+                                           and final_raster is None) else None
     return {
         "artifact_id": artifact_id,
         "title": title,

@@ -17,7 +17,7 @@ pip install -e ".[viz,dev]"
 # 1) 生成合成城市「临江市」（6 区/22 道路/40 地块/医院学校 POI/河流洪水区）
 python scripts/make_synthetic_data.py
 
-# 2) 跑测试：78 个用例 + 14 道起始基准题（含 CRS 度量陷阱 / 中文 UTF-8 / datetime 回归）
+# 2) 跑测试：105 个用例 + 14 道起始基准题（含 CRS 度量陷阱 / 中文 UTF-8 / datetime / 栅格回归）
 python -m pytest -q
 
 # 3) 端到端演示：物流园区选址（缓冲→求交→扣除洪水→度量→分区→出图）
@@ -74,7 +74,15 @@ DSH-GIS/
       桥错误附带中文修复提示
 - [ ] **Phase 1.6 — 时间序列表达**（待做）：时间聚合算子（周/月/时钟）、
       折线图/极坐标图等非地图图表作为一等输出
-- [ ] **Phase 2 — Field GIS**：Raster/DEM/Map Algebra 与矢量交互
+- [x] **Phase 2 — Field GIS（核心算子已落地）**：栅格基建约定（模板显式化/
+      统计摘要随产物/NaN-nodata）+ 22 个 raster.* 小算子（create/from_vector/
+      align/mask/merge/info、distance/distance_decay/cost_distance/cost_path/
+      nearest、con/calc/reclassify/breaks/histogram/weighted_sum、focal/
+      zonal_stats、polygonize/contour/sample）+ gis_inspect/gis_visualize
+      栅格支持；GeoTIFF 产物与跨请求 `ar_xxx#step` 引用同构矢量
+- [ ] **Phase 2.5 — Field GIS 进阶**：插值（IDW/Kriging）、地形派生
+      （slope/aspect/hillshade）、水文链（fill/flow）、视域；zonal.summarize
+      的 data 支持栅格输入
 - [ ] **Phase 3 — Network & Spatial Statistics**：七类补全
 - [ ] **Phase 4 — Scale**：PostGIS/DuckDB-Spatial 后端、并行与缓存、150–200 题全量 benchmark
 

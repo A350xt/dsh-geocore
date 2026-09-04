@@ -76,6 +76,50 @@ zonal 说明：
 - 输出列前缀 `data_`（如 `data_count`、`data_beds_sum_apportioned`）
 - ⚠ 一份数据跨多个区会重复计入各区；`share_pct` 是"占全层比例"，跨区求和 ≠100%
 
+trajectory.build {input, time_field, group_by?}  点按时间排序连轨迹线（输出 point_count/start/end/duration_h）
+
+### 栅格词表（raster 域，GeoTIFF 出入）
+
+```text
+基建    raster.info {input}
+        raster.create {bounds, cellsize, crs?, value?}
+        raster.from_vector {input, cellsize|template, field?, all_touched?}
+        raster.align {input, template, method?}          # nearest/bilinear/cubic
+        raster.mask {input, mask, invert?, fill?}        # mask=矢量或栅格；fill 数值=填值
+        raster.merge {inputs[]}                           # 镶嵌，重叠先到先得
+距离    raster.distance {input, cellsize?, max_distance_m?, pad_m?}
+        raster.distance_decay {input, d0, f0?, mode?}    # linear/square/exponential
+        raster.cost_distance {source, cost}              # 累积成本 = cost×米；NoData/≤0 不可通行
+        raster.cost_path {source, cost, to}              # 成本最短路径（to 取第一个点）
+        raster.nearest {input, ref}                      # 每像元=最近参照要素序号
+逐像元  raster.con {input, condition, true?, false?}     # 条件如 'value >= 500' 或 'nodata'；
+                                                        # 比较条件不改动 NoData；值可为 'nodata'
+        raster.calc {inputs:{别名:引用}, expression}      # 白名单表达式（无 I/O/随机）
+        raster.reclassify {input, mapping:[[lo,hi,new]…], nodata?}
+        raster.breaks {input, classes, method?}          # equal_interval/quantile/jenks，只出断点表
+        raster.histogram {input, bins?}                  # 直方图+累计频率
+        raster.weighted_sum {inputs:[{ref,weight}…]}     # 权重自动归一化
+邻域    raster.focal {input, stat, kernel_size?}         # mean/min/max/median/std（默认 3×3）
+        raster.zonal_stats {regions, data, stats?}       # count/mean/min/max/sum/majority
+转出    raster.polygonize {input, field?, dissolve?}     # 同值溶解；接 query/overlay 闭环
+        raster.contour {input, levels?|interval?}        # 等值线 LineString（level 字段）
+        raster.sample {raster, points, field?}           # 栅格值采样到点（输出矢量）
+```
+
+栅格三条基建约定：
+1. **模板显式化**：组合类算子（calc/weighted_sum/mask/merge 等）默认对齐到
+   首个输入的 origin/cellsize/行列数/CRS，不一致自动重采样并写 warnings；
+2. **统计摘要随产物**：每个栅格步骤的 summaries 自带行列/像元/NoData 占比/
+   分位数；`raster.info` 的 `steps[].table` 是完整元信息表；全 NoData 结果
+   按 E_EMPTY_RESULT 处理（可 allow_empty）；
+3. **nodata 统一 NaN**：内部 float32，落盘 GeoTIFF（result.tif + step_<id>.tif），
+   跨请求引用 `ar_xxx#stepId` 与矢量产物同构。
+
+设计原则：求值与判据分离（breaks/histogram 只出表）、一算子一语义
+（con/reclassify/calc/focal 各司其职）、镜像矢量域命名
+（raster.distance↔proximity.buffer、raster.zonal_stats↔zonal.summarize、
+raster.from_vector/polygonize 互逆、raster.mask↔overlay.clip）。
+
 where 表达式：pandas query 语法；**Python 关键字列名必须用反引号**，
 如 `` `class` == '高速' ``（引擎自动改写为安全别名）。危险关键字直接拒绝。
 时间列已自动解析为 datetime，可直接比较：`time >= "2024-06-01"`。
@@ -112,6 +156,11 @@ style 键：`mode`(single|point|categorical|choropleth)、`field`、
 `figsize`、`dpi`。
 响应：`image_path + legend[] + warnings[]`。中文字体默认 Microsoft YaHei
 （回退 SimHei / Noto Sans CJK）；中文标题与中文文件名均支持。
+
+栅格 source（.tif 路径或 raster 产物的 artifact_id）：
+`style.mode=continuous`（`cmap` + `vmin/vmax` 或 `stretch:[p_lo,p_hi]`
+百分位拉伸，默认 [2,98]，`unit` 定色标名）或
+`categorical`（`category_colors` 类别色表）。
 
 ## 底层协议（供桥实现者）
 
