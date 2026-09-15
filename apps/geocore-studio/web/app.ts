@@ -3,6 +3,7 @@
 import './ui.css'
 import { initMapView, mapView } from './mapview.js'
 import { initOpsBar } from './ops.js'
+import { initComposeView } from './composeview.js'
 import { apiGet } from './api.js'
 
 async function main(): Promise<void> {
@@ -27,6 +28,8 @@ async function main(): Promise<void> {
 
   initMapView()
   initOpsBar()
+  const composeView = initComposeView()
+  document.getElementById('btn-compose')?.addEventListener('click', () => composeView.open())
 
   // 内核健康检查
   try {
@@ -49,6 +52,10 @@ async function main(): Promise<void> {
     if (opt) await mapView.addLayer(opt.value, opt.label, { quiet: true })
   }
   mapView.refreshInventory()
+
+  // 深链支持：?compose=1 直达制图模式（供测试/书签；放在图层预载后，
+  // 否则初始地图框会拿不到图层）
+  if (new URLSearchParams(location.search).get('compose') === '1') composeView.open()
 }
 
 main().catch((exc) => {

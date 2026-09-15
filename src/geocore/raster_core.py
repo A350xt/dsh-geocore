@@ -281,6 +281,13 @@ def make_transform(bounds: tuple, cellsize: float, snap: bool = True):
         maxy = np.ceil(maxy / cellsize) * cellsize
     width = max(1, int(np.ceil((maxx - minx) / cellsize - 1e-9)))
     height = max(1, int(np.ceil((maxy - miny) / cellsize - 1e-9)))
+    if width * height > MAX_CELLS:
+        raise GeoCoreError(
+            E_BAD_REQUEST,
+            f"栅格模板过大：{height}×{width} 超过 {MAX_CELLS} 像元上限；"
+            f"请增大 cellsize 或缩小范围",
+            {"shape": [height, width]},
+        )
     return Affine(cellsize, 0, minx, 0, -cellsize, maxy), (height, width)
 
 

@@ -211,6 +211,14 @@ export function startStudioServer(
         return
       }
 
+      if (url.pathname === '/api/compose' && req.method === 'POST') {
+        // 版面合成（制图模式）：预览与导出共用同一内核渲染器
+        const body = await readBody(req)
+        const result = await bridge.call('compose', body)
+        json(res, 200, { ok: true, result })
+        return
+      }
+
       if (url.pathname === '/api/visualize' && req.method === 'POST') {
         const body = await readBody(req)
         const result = await bridge.call('visualize', body)

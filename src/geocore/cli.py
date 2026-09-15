@@ -58,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
             result = api.analyze(workdir, payload)
         elif action == "visualize":
             result = api.visualize(workdir, payload)
+        elif action == "compose":
+            result = api.compose(workdir, payload)
         elif action == "show":
             result = api.show(workdir, payload.get("artifact_id"))
         elif action == "operations":

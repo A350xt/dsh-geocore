@@ -342,6 +342,28 @@ class MapView {
     return { geojson: '📍', gpkg: '📦', shapefile: '🗂', csv: '📄' }[fmt] ?? '📄'
   }
 
+  /** 制图模式：当前已加载（且可见）图层 → compose 的 layers 规格。 */
+  buildLayoutLayers(): Array<Record<string, unknown>> {
+    const out: Array<Record<string, unknown>> = []
+    for (const entry of this.layers.values()) {
+      if (!entry.visible) continue
+      const spec: Record<string, unknown> = {
+        source: entry.source,
+        label: entry.label,
+        mode: entry.styleMode === 'none' ? 'single' : entry.styleMode,
+      }
+      if (entry.styleField) spec.field = entry.styleField
+      out.push(spec)
+    }
+    return out
+  }
+
+  /** 当前地图视图范围（WGS84：west, south, east, north）。 */
+  currentExtent(): [number, number, number, number] {
+    const b = this.map.getBounds()
+    return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]
+  }
+
   /** 聊天卡片“在地图中查看”入口。 */
   async viewArtifact(artifactId: string, step?: string): Promise<void> {
     await this.refreshInventory()

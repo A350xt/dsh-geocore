@@ -14,7 +14,7 @@ export interface Envelope<T = Record<string, unknown>> {
   error?: WireError;
 }
 
-export type GisAction = 'inspect' | 'analyze' | 'visualize' | 'show' | 'operations' | 'read' | 'list';
+export type GisAction = 'inspect' | 'analyze' | 'visualize' | 'compose' | 'show' | 'operations' | 'read' | 'list';
 
 /**
  * Harness 宿主提供的 tools service（dsh-tools ToolRuntime）。register 接受单个

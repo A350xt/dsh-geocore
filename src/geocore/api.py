@@ -169,6 +169,29 @@ def visualize(workdir: Path, payload: dict) -> dict:
     }
 
 
+def compose(workdir: Path, payload: dict) -> dict:
+    """版面合成（Studio 制图模式的导出/预览出口，预览与成品同一渲染器）。"""
+    from geocore.viz.compose import render_composition
+
+    spec = payload.get("spec") if isinstance(payload.get("spec"), dict) else payload
+    title = str(spec.get("title") or payload.get("title") or "制图")
+    dpi = int(payload.get("dpi", 200))
+    dpi = max(36, min(dpi, 400))
+
+    store = ArtifactStore(Path(workdir))
+    artifact_id, _ = store.create("map", title)
+    out_path = store.image_path_for(artifact_id, "layout")
+    res = render_composition(store, spec, out_path=out_path, dpi=dpi)
+    store.finalize_map(artifact_id, image=str(out_path), legend=[],
+                       source="layout", warnings=res["warnings"],
+                       crs={"analysis": "", "sources": {}})
+    return {
+        "artifact_id": artifact_id,
+        "image_path": str(out_path),
+        "warnings": list(dict.fromkeys(res["warnings"])),
+    }
+
+
 def show(workdir: Path, artifact_id: str) -> dict:
     store = ArtifactStore(Path(workdir))
     meta = store.get(str(artifact_id))
