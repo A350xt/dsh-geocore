@@ -11,13 +11,14 @@ Agent 只见 3 个工具；内核由七类 GIS 原语治理；底层引擎可整
 ## 快速开始
 
 ```bash
-# 0) 依赖：Python ≥3.11；首次安装内核
-pip install -e ".[viz,dev]"
+# 0) 克隆并安装：Python ≥3.11；viz=制图渲染，raster=栅格算子（rasterio/scipy）
+git clone https://github.com/A350xt/dsh-geocore.git && cd dsh-geocore
+pip install -e ".[viz,raster,dev]"
 
 # 1) 生成合成城市「临江市」（6 区/22 道路/40 地块/医院学校 POI/河流洪水区）
 python scripts/make_synthetic_data.py
 
-# 2) 跑测试：105 个用例 + 14 道起始基准题（含 CRS 度量陷阱 / 中文 UTF-8 / datetime / 栅格回归）
+# 2) 跑测试：108 个用例 + 14 道起始基准题（含 CRS 度量陷阱 / 中文 UTF-8 / datetime / 栅格 / 制图回归）
 python -m pytest -q
 
 # 3) 端到端演示：物流园区选址（缓冲→求交→扣除洪水→度量→分区→出图）
